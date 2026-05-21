@@ -675,7 +675,7 @@ function undoTower() {
 }
 
 // ── 점수 상수 ─────────────────────────────────────────
-const CITY_SCORES = { 6: 10000, 7: 30000, 8: 60000 };
+const CITY_SCORES = { 6: 100000, 7: 300000, 8: 600000 };
 
 function calcScore(alIdx) {
   const al = alliances[alIdx];
@@ -1944,7 +1944,7 @@ function renderOcpTab(){
   document.getElementById('ocpCityList').innerHTML = cities.map((c,ci)=>`
     <div class="row" style="display:flex;align-items:center;gap:5px;margin-bottom:5px">
       <span style="font-size:.75rem;min-width:50px;color:${c.color}">${c.label}</span>
-      <span style="font-size:.68rem;color:#666">${(CITY_SCORES[c.level]/1000).toFixed(0)}만점</span>
+      <span style="font-size:.68rem;color:#666">${(CITY_SCORES[c.level]/10000).toFixed(0)}만점</span>
       <select style="flex:1;background:#0d1b2e;border:1px solid #334;border-radius:3px;color:#eee;font-size:.72rem;padding:2px"
         onchange="cities[${ci}].owner=+this.value===-1?null:+this.value;renderOcpTab();draw()">
         ${alOpts.replace(`value="${c.owner==='null'||c.owner==null?-1:c.owner}"`,
