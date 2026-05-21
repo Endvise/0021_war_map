@@ -1357,9 +1357,12 @@ canvas.addEventListener('mouseup',e=>{
       const g=getSnapped(e);
       const al=alliances[activeIdx]; if(!al) return;
       if(towerMode==='build'){
+        const buildCost=getTowerCost(al.towers.length+1);
+        al.cement=+(al.cement-buildCost/1000).toFixed(1);
         al.towers.push({x:g.x,y:g.y,status:'built',
           hp:G('tTowerHp')||TOWER_DEFAULTS.maxHp,
-          maxHp:G('tTowerHp')||TOWER_DEFAULTS.maxHp});
+          maxHp:G('tTowerHp')||TOWER_DEFAULTS.maxHp,
+          buildCost});
       } else if(towerMode==='demolish'){
         // 가장 가까운 타워 철거 (해당 연맹)
         const idx=findNearestTower(al.towers,g.x,g.y);
@@ -1393,8 +1396,54 @@ canvas.addEventListener('contextmenu',e=>{
     draw();
   } else if(hit&&hit.type==='city'){
     showCityOwnerMenu(hit.idx, e.clientX, e.clientY);
+  } else {
+    // 타워 우클릭 감지 — 모든 연맹 탐색
+    let found=null;
+    alliances.forEach((al,ai)=>{
+      if(found) return;
+      const ti=findNearestTower(al.towers,raw.x,raw.y);
+      if(ti>=0) found={al,ai,ti};
+    });
+    if(found) showTowerMenu(found.al,found.ai,found.ti,e.clientX,e.clientY);
   }
 });
+
+function showTowerMenu(al, alIdx, tIdx, px, py){
+  document.getElementById('towerCtxMenu')?.remove();
+  const t=al.towers[tIdx]; if(!t) return;
+  const refund=+((t.buildCost||getTowerCost(al.towers.length))/1000*0.5).toFixed(1);
+  const menu=document.createElement('div');
+  menu.id='towerCtxMenu';
+  menu.style.cssText=`position:fixed;left:${px}px;top:${py}px;background:#0d1b2e;border:1px solid ${al.color}44;border-radius:6px;padding:8px;z-index:9999;min-width:160px;box-shadow:0 4px 16px #000c;font-family:inherit`;
+  const title=document.createElement('div');
+  title.style.cssText=`color:${al.color};font-size:.75rem;margin-bottom:6px;font-weight:bold;border-bottom:1px solid ${al.color}33;padding-bottom:4px`;
+  title.textContent=`${al.name} 타워 #${tIdx+1}`;
+  menu.appendChild(title);
+  const makeBtn=(label,color,onClick)=>{
+    const btn=document.createElement('div');
+    btn.style.cssText=`padding:5px 10px;border-radius:4px;cursor:pointer;font-size:.8rem;color:#fff;margin:2px 0;background:${color}33;border:1px solid ${color}55;transition:background .15s`;
+    btn.innerHTML=label;
+    btn.onmouseenter=()=>btn.style.background=color+'66';
+    btn.onmouseleave=()=>btn.style.background=color+'33';
+    btn.onclick=()=>{ onClick(); menu.remove(); draw(); renderCfgTab(); };
+    menu.appendChild(btn);
+  };
+  if(t.status!=='burning'){
+    makeBtn(`🔥 점화`, '#e65100', ()=>{
+      t.status='burning'; t.burnStart=Date.now();
+      t.burnRatePerSec=G('tBurnRate')||TOWER_DEFAULTS.burnRatePerSec;
+      t.burnDurationSec=TOWER_DEFAULTS.burnDurationSec;
+    });
+  }
+  makeBtn(`🔧 철거 <span style="font-size:.7rem;color:#aaa">(+${refund}k 반환)</span>`, '#b71c1c', ()=>{
+    al.cement=+(al.cement+refund).toFixed(1);
+    al.towers.splice(tIdx,1);
+  });
+  makeBtn('✕ 취소', '#607d8b', ()=>{});
+  document.body.appendChild(menu);
+  const close=ev=>{ if(!menu.contains(ev.target)){menu.remove();document.removeEventListener('mousedown',close);} };
+  setTimeout(()=>document.addEventListener('mousedown',close),10);
+}
 
 function showCityOwnerMenu(cityIdx, px, py){
   const c=cities[cityIdx];
