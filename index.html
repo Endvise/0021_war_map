@@ -659,7 +659,7 @@ const MIN_PPC = 1, MAX_PPC = 16;
 function makeAlliance(id, name, color, hx, hy) {
   return { id, name, color, towers:[],
     helipad:{x:hx, y:hy, r:15},
-    cement:100, towerCount:20, cities6:0, cities7:0, cities8:0,
+    cement:100, towerCount:20, cities6:0, cities7:0, cities8:0, infraSkillEnd:null,
     prismCoins:0, coinChaseUsed:0, coinChaseLastUTC:null, coinChaseLog:[], questClaimed:{} };
 }
 let alliances = [
@@ -1528,7 +1528,7 @@ function addAlliance(){
   const letter=String.fromCharCode(65+alliances.length);
   alliances.push({id:alIdSeq++,name:`${letter} 연맹`,color,towers:[],
     helipad:{x:50+alliances.length*40,y:50,r:30},
-    cement:100, towerCount:20, cities6:1, cities7:0, cities8:0,
+    cement:100, towerCount:20, cities6:1, cities7:0, cities8:0, infraSkillEnd:null,
     prismCoins:0, coinChaseUsed:0, coinChaseLastUTC:null, coinChaseLog:[]});
   renderAllianceBtns(); renderCfgTab(); draw();
 }
@@ -1580,11 +1580,26 @@ function renderCfgTab(){
           const done=!!al.questClaimed[q.key];
           return `<span style="color:${done?'#4ade80':'#475569'};font-size:.62rem">${done?'✓':'○'} ${q.label}(+${q.bonus}k)</span>`;
         }).join('<br>');
+        const skillActive=al.infraSkillEnd&&Date.now()<al.infraSkillEnd;
+        const skillRemMin=skillActive?Math.ceil((al.infraSkillEnd-Date.now())/60000):0;
+        const effBuild=skillActive?Math.round(+document.getElementById('tBuildMin')?.value/3||7):null;
         return `<div style="font-size:.7rem;background:#0d1b2e;border-radius:3px;padding:5px 7px;margin-bottom:4px;line-height:1.7">
           🏙 점령 도시: <span style="color:#ffd54f">${ownedLabels}</span><br>
           📦 실제 생산량: <strong style="color:#4ade80">${ownedProd}/분</strong>
           &nbsp;│&nbsp; 시뮬 생산량: <span style="color:#90caf9;font-size:.65rem">${connProd}/분</span><br>
           💰 다음 탑 비용: <strong style="color:#ef9a9a">${nextCost.toLocaleString()}</strong>
+        </div>
+        <div style="display:flex;align-items:center;gap:5px;margin-bottom:5px">
+          <button class="btn" onclick="activateInfraSkill(${i})"
+            style="flex:1;padding:3px 6px;font-size:.65rem;
+              background:${skillActive?'rgba(251,146,60,.15)':'rgba(30,58,100,.4)'};
+              color:${skillActive?'#fb923c':'#60a5fa'};
+              border:1px solid ${skillActive?'#fb923c44':'#1e4a7a'}">
+            🏗 인프라 건물${skillActive?` ✅`:''}
+          </button>
+          ${skillActive
+            ?`<span style="font-size:.62rem;color:#fb923c">${Math.floor(skillRemMin/60)}시간${skillRemMin%60}분 남음 (건설 ${effBuild}분)</span>`
+            :`<span style="font-size:.62rem;color:#334">1시간 / 건설속도 200%↑</span>`}
         </div>
         <div style="font-size:.62rem;background:#07111e;border-radius:3px;padding:4px 7px;margin-bottom:6px;line-height:1.8;border:1px solid #0d2040">
           <span style="color:#f59e0b;font-size:.58rem;font-family:'Rajdhani',sans-serif;text-transform:uppercase;letter-spacing:1px">퀘스트 보너스</span><br>
@@ -1695,10 +1710,11 @@ function calcFromPlaced(placed,cem,buildMin,startTowerCount,startX,startY,alIdx=
 function runSim(){
   const tx=G('tgtX'),ty=G('tgtY'),bm=G('tBuildMin');
   const results=alliances.map((al,i)=>{
+    const effBm=getEffBuildMin(al,bm);
     const res=al.towers.length>0
-      ?calcFromPlaced(al.towers,al.cement,bm,al.towers.length,al.helipad.x+al.helipad.r/2,al.helipad.y-al.helipad.r/2,i)
-      :calcPath(al.helipad.x+al.helipad.r/2,al.helipad.y-al.helipad.r/2,tx,ty,al.cement,bm,al.towers.length,i);
-    return {al,res};
+      ?calcFromPlaced(al.towers,al.cement,effBm,al.towers.length,al.helipad.x+al.helipad.r/2,al.helipad.y-al.helipad.r/2,i)
+      :calcPath(al.helipad.x+al.helipad.r/2,al.helipad.y-al.helipad.r/2,tx,ty,al.cement,effBm,al.towers.length,i);
+    return {al,res,skillActive:!!al.infraSkillEnd&&Date.now()<al.infraSkillEnd,effBm};
   });
   lastSimResults=results;
   lastCollisions=findCollisions(results);
@@ -2084,11 +2100,30 @@ function hideRanking(){
   document.getElementById('rankingModal').style.display='none';
 }
 
+function activateInfraSkill(idx){
+  const al=alliances[idx];
+  const now=Date.now();
+  if(al.infraSkillEnd&&now<al.infraSkillEnd){
+    // 이미 활성 → 취소
+    al.infraSkillEnd=null;
+  } else {
+    al.infraSkillEnd=now+3600000; // 1시간
+  }
+  renderCfgTab();
+}
+
+function getEffBuildMin(al, baseBm){
+  // 인프라 스킬 활성 시 건설속도 200% 증가 = 3x속도 = 시간 /3
+  if(al.infraSkillEnd&&Date.now()<al.infraSkillEnd) return Math.max(1, baseBm/3);
+  return baseBm;
+}
+
 function showRouteCalc(){
   const alSel=document.getElementById('routeAl');
   alSel.innerHTML=alliances.map((al,i)=>`<option value="${i}" style="color:${al.color}">${al.name}</option>`).join('');
   updateRouteSelects();
   alSel.onchange=updateRouteSelects;
+  document.getElementById('routeBuildMin').oninput=updateRouteSelects;
   document.getElementById('routeModal').style.display='flex';
 }
 
@@ -2100,6 +2135,16 @@ function updateRouteSelects(){
     +al.towers.map((t,i)=>`<option value="tower_${i}">타워 #${i+1} (${t.x}, ${t.y})</option>`).join('');
   const toSel=document.getElementById('routeTo');
   toSel.innerHTML=cities.map((c,i)=>`<option value="${i}">${c.label} (${c.x+c.r/2|0}, ${c.y-c.r/2|0})</option>`).join('');
+  // 스킬 상태 표시
+  const skillEl=document.getElementById('routeSkillInfo');
+  if(skillEl){
+    const skillActive=al.infraSkillEnd&&Date.now()<al.infraSkillEnd;
+    const baseBm=+document.getElementById('routeBuildMin').value||22;
+    const effBm=getEffBuildMin(al,baseBm);
+    skillEl.innerHTML=skillActive
+      ?`<span style="color:#fb923c">🏗 인프라 스킬 활성 — 건설 ${effBm.toFixed(1)}분 적용</span>`
+      :`<span style="color:#334">인프라 스킬 비활성</span>`;
+  }
 }
 
 function calcRoute(){
@@ -2108,6 +2153,7 @@ function calcRoute(){
   const fromVal=document.getElementById('routeFrom').value;
   const toIdx=+document.getElementById('routeTo').value;
   const bm=+document.getElementById('routeBuildMin').value||22;
+  const effBm=getEffBuildMin(al,bm);
   const dest=cities[toIdx]; if(!dest) return;
 
   let sx,sy;
@@ -2142,8 +2188,8 @@ function calcRoute(){
     const newC=checkCityConn(x,y,conn);
     const p=calcProdFromSet(conn,alIdx);
     const cost=getTowerCost(startCount+i+1);
-    const ca=cem+p*bm, wait=Math.max(0,cost-ca)/p;
-    total+=bm+wait; cem=ca-cost+p*wait;
+    const ca=cem+p*effBm, wait=Math.max(0,cost-ca)/p;
+    total+=effBm+wait; cem=ca-cost+p*wait;
     steps.push({num:startCount+i+1,x,y,cost,wait,total,cem,prod:p,newCities:newC});
   }
 
@@ -2400,6 +2446,7 @@ setInterval(()=>{
         <input id="routeBuildMin" type="number" value="22" min="1"
           style="width:70px;background:#0d1b2e;border:1px solid #334;border-radius:4px;color:#eee;padding:3px 6px;font-size:.75rem">
       </div>
+      <div id="routeSkillInfo" style="font-size:.65rem;margin-bottom:6px"></div>
       <button onclick="calcRoute()" style="background:#1a3a5a;color:#60a5fa;border:1px solid #1e4a7a;border-radius:5px;padding:7px;font-size:.8rem;cursor:pointer;font-weight:700">▶ 경로 계산</button>
     </div>
     <div id="routeResult"></div>
