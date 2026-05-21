@@ -307,8 +307,8 @@ tr:hover td{background:rgba(34,211,238,.025)}
     <button class="btn" onclick="showRanking()"
       data-tip="현재 점수 기준 랭킹 순위표 (동점 시 도시 점령 시각 우선)"
       style="background:rgba(255,215,0,.08);color:#ffd700;border:1px solid rgba(255,215,0,.3);padding:3px 9px">🏆 랭킹</button>
-    <button class="btn" onclick="showRouteCalc()"
-      data-tip="타워 위치에서 목표 도시까지 경로와 경유 도시 계산"
+    <button class="btn" id="tmRoute" onclick="setTowerMode('route')"
+      data-tip="경로 모드: 활성화 후 맵에서 우클릭 → 목표 도시까지 경로 계산"
       style="background:rgba(96,165,250,.08);color:#60a5fa;border:1px solid rgba(96,165,250,.3);padding:3px 9px">🗺 경로</button>
     <span class="sep">│</span>
     <button class="btn" id="allyModeBtn" onclick="enterAllyMode()"
@@ -320,19 +320,6 @@ tr:hover td{background:rgba(34,211,238,.025)}
     <button class="btn" id="allyCancelBtn" onclick="exitAllyMode()"
       data-tip="동맹 설정 취소"
       style="display:none;background:rgba(239,68,68,.08);color:#f87171;border:1px solid rgba(239,68,68,.3)">✕ 취소</button>
-    <span class="sep">│</span>
-    <span style="font-size:.65rem;color:#5a7a9a">스냅:</span>
-    <div id="snapBtns" style="display:flex;gap:3px">
-      <button class="btn" id="snap1" onclick="setSnap(1)"
-        data-tip="1칸 단위 자유 배치"
-        style="padding:2px 7px;background:#1a2a3a;color:#a8d8ff;border:1px solid #334">1×1</button>
-      <button class="btn" id="snap2" onclick="setSnap(2)"
-        data-tip="2칸 단위 스냅"
-        style="padding:2px 7px;background:#1a2a3a;color:#a8d8ff;border:1px solid #334">2×2</button>
-      <button class="btn" id="snap3" onclick="setSnap(3)"
-        data-tip="3칸 단위 스냅 (기본값)"
-        style="padding:2px 7px;background:#1565c0;color:#fff;border:1px solid #4fc3f7">3×3</button>
-    </div>
   </div>
   <!-- 2행: 지형 -->
   <div class="hdr-row">
@@ -383,7 +370,7 @@ tr:hover td{background:rgba(34,211,238,.025)}
         <span>🗼 타워 규칙</span>
       </div>
       <div class="duo">
-        <div class="row"><label>건설시간<span class="suffix">(분)</span></label><input id="tBuildMin" type="number" value="22"></div>
+        <div class="row"><label>건설시간<span class="suffix">(분)</span></label><input id="tBuildMin" type="number" value="23"></div>
         <div class="row"><label>전소시간<span class="suffix">(분)</span></label><input id="tBurnMin"  type="number" value="30"></div>
       </div>
       <div class="duo">
@@ -642,15 +629,6 @@ function getConnectedCities(towers) {
   return set;
 }  // 1, 2, or 3
 
-function setSnap(s) {
-  snapMode = s;
-  [1,2,3].forEach(n => {
-    const btn = document.getElementById('snap'+n);
-    btn.style.background = n===s ? '#1565c0' : '#1a2a3a';
-    btn.style.color       = n===s ? '#fff'    : '#a8d8ff';
-    btn.style.borderColor = n===s ? '#4fc3f7' : '#334';
-  });
-}
 const AL_COLORS = ['#64b5f6','#ef5350','#66bb6a','#ffd54f','#ce93d8','#ff8a65','#80deea','#f48fb1'];
 let MAP_W = 398, MAP_H = 404, ppc = 3;
 const MIN_PPC = 1, MAX_PPC = 16;
@@ -674,7 +652,15 @@ let alliances = [
 ];
 let alIdSeq   = 8;
 let activeIdx = 0;
-let towerMode = 'pointer'; // 'pointer' | 'build' | 'demolish' | 'ignite'
+let towerMode = 'pointer'; // 'pointer' | 'build' | 'demolish' | 'ignite' | 'route'
+let waypoints = []; // 경유지 깃발 [{x,y}]
+let draggingWpIdx = null;
+const WP_HIT = 8; // 경유지 클릭 감지 반경 (맵 좌표 단위)
+function findNearestWaypoint(x,y){
+  let best=-1, bestD=WP_HIT;
+  waypoints.forEach((w,i)=>{const d=Math.hypot(w.x-x,w.y-y);if(d<bestD){bestD=d;best=i;}});
+  return best;
+}
 
 const TOWER_DEFAULTS = { maxHp:7200, burnRatePerSec:5, burnDurationSec:900 };
 
@@ -684,15 +670,16 @@ function setTowerMode(m) {
     pointer: {id:'tmPointer', bg:'#1a3a1a', border:'#4ade80', color:'#4ade80'},
     build:   {id:'tmBuild',   bg:'#1565c0', border:'#4fc3f7', color:'#fff'},
     demolish:{id:'tmDemol',   bg:'#b71c1c', border:'#ef5350', color:'#fff'},
-    ignite:  {id:'tmIgnite',  bg:'#e65100', border:'#ff9800', color:'#fff'}
+    ignite:  {id:'tmIgnite',  bg:'#e65100', border:'#ff9800', color:'#fff'},
+    route:   {id:'tmRoute',   bg:'#1a2040', border:'#60a5fa', color:'#60a5fa'}
   };
   Object.entries(cfg).forEach(([k,s])=>{
     const btn=document.getElementById(s.id); if(!btn) return;
     btn.style.background  = k===m ? s.bg      : '#1a2a3a';
-    btn.style.color       = k===m ? s.color   : (k==='ignite'?'#ffae33':'#a8d8ff');
+    btn.style.color       = k===m ? s.color   : (k==='ignite'?'#ffae33':k==='route'?'#60a5fa':'#a8d8ff');
     btn.style.borderColor = k===m ? s.border  : '#334';
   });
-  canvas.style.cursor = m==='pointer' ? 'default' : (m==='build' ? 'crosshair' : 'pointer');
+  canvas.style.cursor = m==='pointer' ? 'default' : 'crosshair';
 }
 
 function undoTower() {
@@ -940,6 +927,7 @@ function draw() {
   // 타워
   alliances.forEach(al => drawBlocks(al.towers, al.color, getConnectedTowers(al)));
   drawCollisionMarkers();
+  drawWaypoints();
   if (ghost) drawGhost();
   saveLS();
 }
@@ -1071,6 +1059,48 @@ function drawGhost(){
   ctx.fillStyle=al.color+'18'; ctx.strokeStyle=al.color+'88'; ctx.lineWidth=1.5;
   ctx.setLineDash([3,3]); ctx.fillRect(cx-s/2,cy-s/2,s,s); ctx.strokeRect(cx-s/2,cy-s/2,s,s);
   ctx.setLineDash([]);
+}
+
+// ── 경유지 깃발 ──────────────────────────────────────────
+function drawWaypoints(){
+  if(!waypoints.length) return;
+  ctx.save();
+  // 연결선
+  ctx.strokeStyle='rgba(96,165,250,0.5)';
+  ctx.lineWidth=1.5; ctx.setLineDash([5,3]);
+  ctx.beginPath();
+  waypoints.forEach((w,i)=>{
+    const {cx,cy}=toC(w.x,w.y);
+    if(i===0) ctx.moveTo(cx,cy); else ctx.lineTo(cx,cy);
+  });
+  ctx.stroke(); ctx.setLineDash([]);
+  // 깃발 개별 렌더
+  waypoints.forEach((w,i)=>{
+    const {cx,cy}=toC(w.x,w.y);
+    const isDrag=draggingWpIdx===i;
+    // 폴대
+    ctx.strokeStyle=isDrag?'#93c5fd':'#60a5fa';
+    ctx.lineWidth=1.5;
+    ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(cx,cy-ppc*5); ctx.stroke();
+    // 깃발 삼각형
+    ctx.fillStyle=isDrag?'#93c5fd':'#60a5fa';
+    ctx.beginPath();
+    ctx.moveTo(cx,cy-ppc*5);
+    ctx.lineTo(cx+ppc*3,cy-ppc*3.5);
+    ctx.lineTo(cx,cy-ppc*2);
+    ctx.closePath(); ctx.fill();
+    // 번호
+    if(ppc>=2){
+      ctx.fillStyle='#fff';
+      ctx.font=`bold ${Math.max(8,ppc*1.5)}px JetBrains Mono,monospace`;
+      ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText(i+1, cx+ppc*1.5, cy-ppc*3.5);
+    }
+    // 기준점 점
+    ctx.fillStyle='#60a5fa';
+    ctx.beginPath(); ctx.arc(cx,cy,ppc*1.2,0,Math.PI*2); ctx.fill();
+  });
+  ctx.restore();
 }
 
 // ── 충돌 마커 ────────────────────────────────────────────
@@ -1283,6 +1313,12 @@ function getSnapped(e){const raw=getRaw(e);return snapPos(raw.x,raw.y);}
 
 canvas.addEventListener('mousedown',e=>{
   if(e.button!==0) return;
+  if(towerMode==='route'){
+    const raw=getRaw(e);
+    const wi=findNearestWaypoint(raw.x,raw.y);
+    if(wi>=0){ draggingWpIdx=wi; canvas.style.cursor='grabbing'; }
+    return;
+  }
   if(allyMode){
     const raw=getRaw(e), hit=hitTest(raw.x,raw.y);
     if(hit&&hit.type==='helipad'){
@@ -1319,6 +1355,17 @@ canvas.addEventListener('mousedown',e=>{
 
 canvas.addEventListener('mousemove',e=>{
   const raw=getRaw(e);
+  if(towerMode==='route'){
+    if(draggingWpIdx!==null){
+      waypoints[draggingWpIdx]={x:Math.round(raw.x),y:Math.round(raw.y)};
+      canvas.style.cursor='grabbing';
+    } else {
+      const wi=findNearestWaypoint(raw.x,raw.y);
+      canvas.style.cursor=wi>=0?'grab':'crosshair';
+    }
+    document.getElementById('posBar').textContent=`좌표: (${Math.round(raw.x)}, ${Math.round(raw.y)})`;
+    draw(); return;
+  }
   if(allyMode){ // 동맹 설정 모드 중 드래그 방지
     const hit=hitTest(raw.x,raw.y);
     canvas.style.cursor=hit&&hit.type==='helipad'?'pointer':'crosshair';
@@ -1347,6 +1394,11 @@ canvas.addEventListener('mousemove',e=>{
 
 canvas.addEventListener('mouseup',e=>{
   if(e.button!==0) return;
+  if(towerMode==='route'){
+    draggingWpIdx=null;
+    canvas.style.cursor='crosshair';
+    return;
+  }
   if(allyMode){ drag={}; isDragging=false; return; }
   if(terrainMode&&drawingTerrain){
     const raw=getRaw(e);
@@ -1401,7 +1453,14 @@ canvas.addEventListener('mouseup',e=>{
 canvas.addEventListener('mouseleave',()=>{drag={};isDragging=false;ghost=null;drawingTerrain=null;canvas.style.cursor='crosshair';draw();});
 canvas.addEventListener('contextmenu',e=>{
   e.preventDefault();
-  const raw=getRaw(e), hit=hitTest(raw.x,raw.y);
+  const raw=getRaw(e);
+  if(towerMode==='route'){
+    const wi=findNearestWaypoint(raw.x,raw.y);
+    if(wi>=0) waypoints.splice(wi,1);
+    else waypoints.push({x:Math.round(raw.x),y:Math.round(raw.y)});
+    draw(); return;
+  }
+  const hit=hitTest(raw.x,raw.y);
   if(hit&&hit.type==='helipad'){
     relSrcIdx=relSrcIdx===hit.idx?null:hit.idx;
     draw();
@@ -2118,52 +2177,34 @@ function getEffBuildMin(al, baseBm){
   return baseBm;
 }
 
-function showRouteCalc(){
-  const alSel=document.getElementById('routeAl');
-  alSel.innerHTML=alliances.map((al,i)=>`<option value="${i}" style="color:${al.color}">${al.name}</option>`).join('');
-  updateRouteSelects();
-  alSel.onchange=updateRouteSelects;
-  document.getElementById('routeBuildMin').oninput=updateRouteSelects;
-  document.getElementById('routeModal').style.display='flex';
-}
-
-function updateRouteSelects(){
-  const alIdx=+document.getElementById('routeAl').value;
-  const al=alliances[alIdx]; if(!al) return;
-  const fromSel=document.getElementById('routeFrom');
-  fromSel.innerHTML=`<option value="helipad">🚁 헬기장 (${al.helipad.x+al.helipad.r/2|0}, ${al.helipad.y-al.helipad.r/2|0})</option>`
-    +al.towers.map((t,i)=>`<option value="tower_${i}">타워 #${i+1} (${t.x}, ${t.y})</option>`).join('');
-  const toSel=document.getElementById('routeTo');
-  toSel.innerHTML=cities.map((c,i)=>`<option value="${i}">${c.label} (${c.x+c.r/2|0}, ${c.y-c.r/2|0})</option>`).join('');
-  // 스킬 상태 표시
-  const skillEl=document.getElementById('routeSkillInfo');
-  if(skillEl){
-    const skillActive=al.infraSkillEnd&&Date.now()<al.infraSkillEnd;
-    const baseBm=+document.getElementById('routeBuildMin').value||22;
-    const effBm=getEffBuildMin(al,baseBm);
-    skillEl.innerHTML=skillActive
-      ?`<span style="color:#fb923c">🏗 인프라 스킬 활성 — 건설 ${effBm.toFixed(1)}분 적용</span>`
-      :`<span style="color:#334">인프라 스킬 비활성</span>`;
-  }
-}
-
-function calcRoute(){
-  const alIdx=+document.getElementById('routeAl').value;
-  const al=alliances[alIdx]; if(!al) return;
-  const fromVal=document.getElementById('routeFrom').value;
-  const toIdx=+document.getElementById('routeTo').value;
-  const bm=+document.getElementById('routeBuildMin').value||22;
+function calcRouteAt(rawX, rawY){
+  const al=alliances[activeIdx]; if(!al) return;
+  const bm=G('tBuildMin')||23;
   const effBm=getEffBuildMin(al,bm);
-  const dest=cities[toIdx]; if(!dest) return;
 
-  let sx,sy;
-  if(fromVal==='helipad'){ sx=al.helipad.x+al.helipad.r/2; sy=al.helipad.y-al.helipad.r/2; }
-  else { const ti=+fromVal.split('_')[1]; const t=al.towers[ti]; sx=t.x; sy=t.y; }
+  // 출발: 마지막 타워 또는 헬기장
+  let sx,sy,startCount,fromLabel;
+  if(al.towers.length>0){
+    const lastT=al.towers[al.towers.length-1];
+    sx=lastT.x; sy=lastT.y; startCount=al.towers.length;
+    fromLabel=`타워 #${al.towers.length}`;
+  } else {
+    sx=al.helipad.x+al.helipad.r/2; sy=al.helipad.y-al.helipad.r/2;
+    startCount=0; fromLabel='헬기장';
+  }
+
+  // 목적지: 클릭 지점에서 가장 가까운 도시
+  let toIdx=0, minD=Infinity;
+  cities.forEach((c,ci)=>{
+    const cx=c.x+c.r/2, cy=c.y-c.r/2;
+    const d=Math.sqrt((cx-rawX)**2+(cy-rawY)**2);
+    if(d<minD){ minD=d; toIdx=ci; }
+  });
+  const dest=cities[toIdx]; if(!dest) return;
 
   const tx=dest.x+dest.r/2, ty=dest.y-dest.r/2;
   const dist=Math.sqrt((tx-sx)**2+(ty-sy)**2);
   const n=Math.ceil(dist/(TS+GAP));
-  const startCount=fromVal==='helipad'?al.towers.length:(+fromVal.split('_')[1]+1);
 
   const waypointCities=[];
   cities.forEach((c,ci)=>{
@@ -2186,7 +2227,7 @@ function calcRoute(){
     const frac=(i+1)/n;
     const x=Math.round(sx+(tx-sx)*frac), y=Math.round(sy+(ty-sy)*frac);
     const newC=checkCityConn(x,y,conn);
-    const p=calcProdFromSet(conn,alIdx);
+    const p=calcProdFromSet(conn,activeIdx);
     const cost=getTowerCost(startCount+i+1);
     const ca=cem+p*effBm, wait=Math.max(0,cost-ca)/p;
     total+=effBm+wait; cem=ca-cost+p*wait;
@@ -2194,14 +2235,14 @@ function calcRoute(){
   }
 
   const totalH=(total/60).toFixed(1);
+  const skillActive=al.infraSkillEnd&&Date.now()<al.infraSkillEnd;
   const wc=waypointCities.map(w=>`<span style="color:${w.c.level===8?'#ff8a65':w.c.level===7?'#ffd54f':'#aed581'}">${w.c.label}</span>`).join(' → ');
 
-  let html=`<div style="background:#080e18;border-radius:6px;padding:10px;margin-bottom:8px">
-    <div style="font-size:.75rem;color:#60a5fa;margin-bottom:4px">
-      📍 ${fromVal==='helipad'?'헬기장':('타워 #'+(+fromVal.split('_')[1]+1))} → ${dest.label}
-    </div>
-    <div style="font-size:.7rem;color:#aaa">거리: ${dist.toFixed(0)}칸 | 필요 타워: <b style="color:#fff">${n}개</b> | 예상시간: <b style="color:#4ade80">${totalH}시간</b></div>
-    ${wc?`<div style="font-size:.68rem;color:#888;margin-top:4px">경유 도시: ${wc} → <span style="color:#60a5fa">${dest.label}</span></div>`:''}
+  const html=`<div style="background:#080e18;border-radius:6px;padding:10px;margin-bottom:8px">
+    <div style="font-size:.75rem;color:${al.color};font-weight:700;margin-bottom:4px">${al.name} — ${fromLabel} → ${dest.label}</div>
+    ${skillActive?`<div style="font-size:.65rem;color:#fb923c;margin-bottom:3px">🏗 인프라스킬 활성 — 건설 ${effBm.toFixed(1)}분</div>`:''}
+    <div style="font-size:.7rem;color:#aaa">거리: ${dist.toFixed(0)}칸 | 필요 타워: <b style="color:#fff">${n}개</b> | 예상: <b style="color:#4ade80">${totalH}시간</b></div>
+    ${wc?`<div style="font-size:.68rem;color:#888;margin-top:4px">경유: ${wc} → <span style="color:#60a5fa">${dest.label}</span></div>`:''}
   </div>
   <div style="overflow-x:auto">
   <table style="width:100%;border-collapse:collapse;font-size:.65rem">
@@ -2211,7 +2252,7 @@ function calcRoute(){
       <th style="padding:3px 5px">비용</th>
       <th style="padding:3px 5px">대기</th>
       <th style="padding:3px 5px">누적</th>
-      <th style="padding:3px 5px">생산량</th>
+      <th style="padding:3px 5px">생산</th>
       <th style="padding:3px 5px">경유</th>
     </tr></thead><tbody>
     ${steps.map((s,i)=>{
@@ -2233,11 +2274,11 @@ function calcRoute(){
     </tbody>
   </table></div>`;
 
-  document.getElementById('routeResult').innerHTML=html;
-}
-
-function hideRouteCalc(){
-  document.getElementById('routeModal').style.display='none';
+  // 📊 탭에 결과 표시 후 탭 전환
+  document.getElementById('tabRes').innerHTML=
+    `<div style="font-size:.62rem;color:#3a6080;margin-bottom:6px;font-family:'JetBrains Mono',monospace">🗺 경로모드 — 우클릭으로 재계산</div>`+html;
+  const resBtn=[...document.querySelectorAll('.tab')].find(t=>t.getAttribute('onclick')?.includes("'res'"));
+  if(resBtn) showTab('res',resBtn);
 }
 
 function generateSatCoins(){
@@ -2417,41 +2458,6 @@ setInterval(()=>{
   el.innerHTML = utc + ' UTC' + (simTime ? ' <span style="color:#ff9800;font-size:.65rem">[예측모드]</span>' : '');
 }, 1000);
 </script>
-<!-- 경로 계산 모달 -->
-<div id="routeModal" onclick="if(event.target===this)hideRouteCalc()"
-  style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;align-items:center;justify-content:center">
-  <div style="background:#0d1825;border:1px solid #1e3a5a;border-radius:10px;padding:20px;min-width:340px;max-width:520px;width:92%;max-height:85vh;overflow-y:auto">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
-      <span style="font-size:1rem;font-weight:700;color:#60a5fa">🗺 경로 계산</span>
-      <button onclick="hideRouteCalc()" style="background:none;border:none;color:#888;font-size:1.1rem;cursor:pointer">✕</button>
-    </div>
-    <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px">
-      <div style="display:flex;gap:6px;align-items:center">
-        <span style="font-size:.72rem;color:#888;min-width:50px">연맹</span>
-        <select id="routeAl" style="flex:1;background:#0d1b2e;border:1px solid #334;border-radius:4px;color:#eee;padding:3px 6px;font-size:.75rem">
-        </select>
-      </div>
-      <div style="display:flex;gap:6px;align-items:center">
-        <span style="font-size:.72rem;color:#888;min-width:50px">출발</span>
-        <select id="routeFrom" style="flex:1;background:#0d1b2e;border:1px solid #334;border-radius:4px;color:#eee;padding:3px 6px;font-size:.75rem">
-        </select>
-      </div>
-      <div style="display:flex;gap:6px;align-items:center">
-        <span style="font-size:.72rem;color:#888;min-width:50px">목적지</span>
-        <select id="routeTo" style="flex:1;background:#0d1b2e;border:1px solid #334;border-radius:4px;color:#eee;padding:3px 6px;font-size:.75rem">
-        </select>
-      </div>
-      <div style="display:flex;gap:6px;align-items:center">
-        <span style="font-size:.72rem;color:#888;min-width:50px">건설(분)</span>
-        <input id="routeBuildMin" type="number" value="22" min="1"
-          style="width:70px;background:#0d1b2e;border:1px solid #334;border-radius:4px;color:#eee;padding:3px 6px;font-size:.75rem">
-      </div>
-      <div id="routeSkillInfo" style="font-size:.65rem;margin-bottom:6px"></div>
-      <button onclick="calcRoute()" style="background:#1a3a5a;color:#60a5fa;border:1px solid #1e4a7a;border-radius:5px;padding:7px;font-size:.8rem;cursor:pointer;font-weight:700">▶ 경로 계산</button>
-    </div>
-    <div id="routeResult"></div>
-  </div>
-</div>
 <!-- 랭킹 모달 -->
 <div id="rankingModal" onclick="if(event.target===this)hideRanking()"
   style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;align-items:center;justify-content:center">
