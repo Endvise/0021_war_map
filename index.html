@@ -840,18 +840,10 @@ function draw() {
   ctx.fillStyle='#0a0f1a'; ctx.fillRect(0,0,canvas.width,canvas.height);
   drawGrid();
   drawTerrains();
-  // 동맹 그룹 시각화 — 연맹간 연결선 + 배지
+  // 동맹 그룹 시각화 — 헬기장 컬러 링 + 배지
   const allyGroups=getAllyGroups();
   allyGroups.forEach((grp,gi)=>{
     const gc=ALLY_GROUP_COLORS[gi%ALLY_GROUP_COLORS.length];
-    for(let a=0;a<grp.length;a++) for(let b=a+1;b<grp.length;b++){
-      const ha=alliances[grp[a]].helipad, hb=alliances[grp[b]].helipad;
-      const {cx:ax,cy:ay}=toC(ha.x+ha.r/2,ha.y-ha.r/2);
-      const {cx:bx,cy:by}=toC(hb.x+hb.r/2,hb.y-hb.r/2);
-      ctx.strokeStyle=gc+'99'; ctx.lineWidth=1.5; ctx.setLineDash([6,4]);
-      ctx.beginPath(); ctx.moveTo(ax,ay); ctx.lineTo(bx,by); ctx.stroke();
-      ctx.setLineDash([]);
-    }
     grp.forEach(idx=>{
       const al=alliances[idx], h=al.helipad;
       const {cx,cy}=toC(h.x,h.y), spx=h.r*ppc;
