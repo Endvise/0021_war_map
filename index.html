@@ -598,19 +598,45 @@ const isConn = (a,b) => {
   const dx=Math.abs(b.x-a.x), dy=Math.abs(b.y-a.y);
   return (dx<TS && Math.max(0,dy-TS)<=GAP) || (dy<TS && Math.max(0,dx-TS)<=GAP);
 };
-// 타워 ↔ 헬기장 연결 (헬기장 r=15, 반폭 7.5)
+// 타워 ↔ 헬기장 연결
 function isConnToHelipad(t,h){
   const hcx=h.x+h.r/2, hcy=h.y-h.r/2, hs=TS/2+h.r/2;
   const dx=Math.abs(t.x-hcx), dy=Math.abs(t.y-hcy);
   return (dx<hs && Math.max(0,dy-hs)<=GAP) || (dy<hs && Math.max(0,dx-hs)<=GAP);
 }
-// 헬기장에서 BFS로 연결된 타워 인덱스 Set 반환
+// 타워 ↔ 도시 영토 연결 (no corner touch)
+function isTowerConnToCity(t,c){
+  const ccx=c.x+c.r/2, ccy=c.y-c.r/2;
+  const adx=Math.abs(t.x-ccx), ady=Math.abs(t.y-ccy), hs=TS/2+c.r/2;
+  return (adx<hs && Math.max(0,ady-hs)<=GAP) || (ady<hs && Math.max(0,adx-hs)<=GAP);
+}
+// 도시 ↔ 헬기장 영토 연결
+function isCityConnToHelipad(c,h){
+  const hcx=h.x+h.r/2, hcy=h.y-h.r/2;
+  const ccx=c.x+c.r/2, ccy=c.y-c.r/2;
+  const adx=Math.abs(ccx-hcx), ady=Math.abs(ccy-hcy), hs=h.r/2+c.r/2;
+  return (adx<hs && Math.max(0,ady-hs)<=GAP) || (ady<hs && Math.max(0,adx-hs)<=GAP);
+}
+// 이 연맹이 도시를 브릿지로 사용할 수 있는지 (미점령이거나 자기 소유)
+function isCityBridgeableBy(c,al){ return c.owner===null || c.owner===al.id; }
+// 헬기장에서 BFS — 타워+도시 영토 모두 노드로 사용
 function getConnectedTowers(al){
   const ts=al.towers; if(!ts.length) return new Set();
-  const conn=new Set(), q=[];
-  ts.forEach((t,i)=>{ if(isConnToHelipad(t,al.helipad)){conn.add(i);q.push(i);} });
-  while(q.length){ const ci=q.shift(); ts.forEach((t,i)=>{ if(!conn.has(i)&&isConn(ts[ci],t)){conn.add(i);q.push(i);} }); }
-  return conn;
+  const connT=new Set(), connC=new Set(), q=[];
+  ts.forEach((t,i)=>{ if(isConnToHelipad(t,al.helipad)){connT.add(i);q.push({k:'t',i});} });
+  cities.forEach((c,ci)=>{ if(isCityBridgeableBy(c,al)&&isCityConnToHelipad(c,al.helipad)){connC.add(ci);q.push({k:'c',i:ci});} });
+  while(q.length){
+    const {k,i}=q.shift();
+    if(k==='t'){
+      const t=ts[i];
+      ts.forEach((t2,j)=>{ if(!connT.has(j)&&isConn(t,t2)){connT.add(j);q.push({k:'t',i:j});} });
+      cities.forEach((c,ci)=>{ if(!connC.has(ci)&&isCityBridgeableBy(c,al)&&isTowerConnToCity(t,c)){connC.add(ci);q.push({k:'c',i:ci});} });
+    } else {
+      const c=cities[i];
+      ts.forEach((t2,j)=>{ if(!connT.has(j)&&isTowerConnToCity(t2,c)){connT.add(j);q.push({k:'t',i:j});} });
+    }
+  }
+  return connT;
 }
 const fmtK   = v => (v/1000).toFixed(1)+'k';
 const fmtT   = m => { const h=Math.floor(m/60),mn=Math.round(m%60); return h>0?`${h}h ${mn}m`:`${mn}m`; };
@@ -676,10 +702,13 @@ function draw() {
   }
   // 도시 (점령 연맹 색상 + 연결 여부 표시)
   cities.forEach((c,ci) => {
+    // BFS 연결된 타워 + 헬기장이 해당 도시에 닿는 연맹만 connAlliances
     const connAlliances = alliances.filter(al => {
-      const towers = al.towers.length>0 ? al.towers : [{x:al.helipad.x+al.helipad.r/2,y:al.helipad.y-al.helipad.r/2}];
-      const s = new Set(); getConnectedCities(towers).forEach(id=>s.add(id));
-      return s.has(ci);
+      const connSet = getConnectedTowers(al);
+      const connTowers = al.towers.filter((_,i) => connSet.has(i));
+      // 헬기장 자체도 도시에 닿을 수 있음
+      if(isCityConnToHelipad(c, al.helipad)) return true;
+      return connTowers.some(t => isTowerConnToCity(t, c));
     });
     const owner = c.owner!=null ? alliances[c.owner] : null;
     const displayColor = owner ? owner.color : c.color;
@@ -1126,8 +1155,41 @@ canvas.addEventListener('contextmenu',e=>{
   if(hit&&hit.type==='helipad'){
     relSrcIdx=relSrcIdx===hit.idx?null:hit.idx;
     draw();
+  } else if(hit&&hit.type==='city'){
+    showCityOwnerMenu(hit.idx, e.clientX, e.clientY);
   }
 });
+
+function showCityOwnerMenu(cityIdx, px, py){
+  const c=cities[cityIdx];
+  document.getElementById('cityOwnerMenu')?.remove();
+  const menu=document.createElement('div');
+  menu.id='cityOwnerMenu';
+  menu.style.cssText=`position:fixed;left:${px}px;top:${py}px;background:#0d1b2e;border:1px solid #1e3a5f;border-radius:6px;padding:8px;z-index:9999;min-width:150px;box-shadow:0 4px 16px #000c;font-family:inherit`;
+  const title=document.createElement('div');
+  title.style.cssText='color:#90caf9;font-size:.75rem;margin-bottom:6px;font-weight:bold;border-bottom:1px solid #1e3a5f;padding-bottom:4px;';
+  title.textContent=`${c.label} 소유권 설정`;
+  menu.appendChild(title);
+  const makeBtn=(label,color,onClick)=>{
+    const btn=document.createElement('div');
+    btn.style.cssText=`padding:5px 10px;border-radius:4px;cursor:pointer;font-size:.8rem;color:#fff;margin:2px 0;background:${color}33;border:1px solid ${color}55;transition:background .15s`;
+    btn.textContent=label;
+    btn.onmouseenter=()=>btn.style.background=color+'66';
+    btn.onmouseleave=()=>btn.style.background=color+'33';
+    btn.onclick=()=>{ onClick(); menu.remove(); draw(); };
+    menu.appendChild(btn);
+  };
+  makeBtn('소유 없음','#607d8b',()=>{ c.owner=null; });
+  // 이 도시에 타워가 닿아있는 연맹만 표시, 없으면 전체 표시
+  const candidates=alliances.filter(al=>al.towers.some(t=>isTowerConnToCity(t,c)));
+  (candidates.length?candidates:alliances).forEach(al=>{
+    const mark=c.owner===al.id?' ✓':'';
+    makeBtn(al.name+mark, al.color, ()=>{ c.owner=al.id; });
+  });
+  document.body.appendChild(menu);
+  const close=ev=>{ if(!menu.contains(ev.target)){menu.remove();document.removeEventListener('mousedown',close);} };
+  setTimeout(()=>document.addEventListener('mousedown',close),10);
+}
 
 mapWrap.addEventListener('wheel',e=>{
   e.preventDefault();
