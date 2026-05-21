@@ -634,7 +634,7 @@ function makeAlliance(id, name, color, hx, hy) {
   return { id, name, color, towers:[],
     helipad:{x:hx, y:hy, r:15},
     cement:100, towerCount:20, cities6:0, cities7:0, cities8:0,
-    prismCoins:0, coinChaseUsed:0, coinChaseLastUTC:null, questClaimed:{} };
+    prismCoins:0, coinChaseUsed:0, coinChaseLastUTC:null, coinChaseLog:[], questClaimed:{} };
 }
 let alliances = [
   makeAlliance(0,'A 연맹', AL_COLORS[0],  84, 371),
@@ -1450,7 +1450,7 @@ function addAlliance(){
   alliances.push({id:alIdSeq++,name:`${letter} 연맹`,color,towers:[],
     helipad:{x:50+alliances.length*40,y:50,r:30},
     cement:100, towerCount:20, cities6:1, cities7:0, cities8:0,
-    prismCoins:0, coinChaseUsed:0, coinChaseLastUTC:null});
+    prismCoins:0, coinChaseUsed:0, coinChaseLastUTC:null, coinChaseLog:[]});
   renderAllianceBtns(); renderCfgTab(); draw();
 }
 
@@ -1692,6 +1692,8 @@ function findNearestTower(towers, x, y) {
 
 // ── 동맹 관계 탭 ──────────────────────────────────────
 let relSrcIdx = null;
+// 코인추격 2단계 상태: null | {alIdx, step:'target'} | {alIdx, targetCityIdx, step:'result'}
+let coinChaseStep = null;
 
 // ── 동맹 설정 모드 ─────────────────────────────────────
 let allyMode = false;
@@ -1834,30 +1836,78 @@ function renderEvtTab(){
       <button class="btn" style="padding:2px 7px;font-size:.63rem;background:#1a2a1a;color:#ffd54f;border:1px solid #665500"
         onclick="generateSatCoins()" data-tip="토요일 UTC 00:00 — 각 7도시에 450k 코인 생성">💎 토요일 코인 생성</button>
     </div>`;
+    const city7s=cities.filter(c=>c.level===7);
     coinHtml+=alliances.map((al,i)=>{
-      const used = al.coinChaseUsed||0;
-      const lastUse = al.coinChaseLastUTC ? new Date(al.coinChaseLastUTC) : null;
-      const coolEnd = lastUse ? new Date(lastUse.getTime()+12*3600000) : null;
-      const onCooldown = coolEnd && now<coolEnd;
-      const remainMin = onCooldown ? Math.ceil((coolEnd-now)/60000) : 0;
+      const used=al.coinChaseUsed||0;
+      const lastUse=al.coinChaseLastUTC?new Date(al.coinChaseLastUTC):null;
+      const coolEnd=lastUse?new Date(lastUse.getTime()+12*3600000):null;
+      const onCooldown=coolEnd&&now<coolEnd;
+      const remainMin=onCooldown?Math.ceil((coolEnd-now)/60000):0;
+      const canUse=used<2&&!onCooldown;
       const owned7=cities.filter(c=>c.owner===i&&c.level===7);
       const lastCity=owned7.length>0?owned7.reduce((a,b)=>(a.conqueredAt||0)>(b.conqueredAt||0)?a:b):null;
-      const destLabel=lastCity?`→ ${lastCity.label}`:'→ 연맹 직접';
-      const directCoins=al.prismCoins||0;
+      const destLabel=lastCity?lastCity.label:'연맹 직접';
+      const log=al.coinChaseLog||[];
+
+      // 2단계 상태 UI
+      let stepHtml='';
+      if(coinChaseStep&&coinChaseStep.alIdx===i){
+        if(coinChaseStep.step==='target'){
+          stepHtml=`<div style="margin-top:6px;background:#0a1520;border-radius:4px;padding:5px">
+            <div style="font-size:.65rem;color:#ffd54f;margin-bottom:4px">⚔️ 약탈 대상 7도시 선택</div>
+            <div style="display:flex;flex-wrap:wrap;gap:3px">
+              ${city7s.map(c=>{
+                const ownerAl=c.owner!=null?alliances[c.owner]:null;
+                return `<button class="btn" onclick="selectCoinTarget(${c.id})"
+                  style="padding:3px 6px;font-size:.63rem;background:${ownerAl?ownerAl.color+'22':'#1a2a3a'};
+                    color:${ownerAl?ownerAl.color:'#aaa'};border:1px solid ${ownerAl?ownerAl.color+'66':'#334'}">
+                  ${c.label}${ownerAl?' ('+ownerAl.name+')':' (무점령)'}
+                </button>`;
+              }).join('')}
+            </div>
+            <button class="btn" onclick="coinChaseStep=null;renderEvtTab()"
+              style="margin-top:4px;padding:2px 8px;font-size:.62rem;color:#666;border:1px solid #334">취소</button>
+          </div>`;
+        } else if(coinChaseStep.step==='result'){
+          const tc=cities.find(c=>c.id===coinChaseStep.targetCityId);
+          const tcOwner=tc&&tc.owner!=null?alliances[tc.owner]:null;
+          stepHtml=`<div style="margin-top:6px;background:#0a1520;border-radius:4px;padding:5px">
+            <div style="font-size:.65rem;color:#ffd54f;margin-bottom:4px">
+              🎯 <b>${tc?tc.label:'?'}</b>${tcOwner?' ('+tcOwner.name+')':' (무점령)'} 약탈 결과
+            </div>
+            <div style="display:flex;gap:4px">
+              <button class="btn" onclick="confirmCoinChase(true)"
+                style="flex:1;padding:4px;font-size:.65rem;background:#1a3a1a;color:#4ade80;border:1px solid #2e7d32">✅ 성공 (+90k)</button>
+              <button class="btn" onclick="confirmCoinChase(false)"
+                style="flex:1;padding:4px;font-size:.65rem;background:#3a1010;color:#f87171;border:1px solid #7f0000">❌ 실패 (0)</button>
+            </div>
+            <button class="btn" onclick="coinChaseStep=null;renderEvtTab()"
+              style="margin-top:4px;padding:2px 8px;font-size:.62rem;color:#666;border:1px solid #334">취소</button>
+          </div>`;
+        }
+      }
+
+      // 이력 표시
+      const logHtml=log.length?`<div style="margin-top:4px;font-size:.6rem;color:#555">
+        ${log.map(l=>`<span style="color:${l.success?'#4ade80':'#f87171'}">${l.success?'✅':'❌'}</span> ${l.target}${l.success?' +90k':''}`).join(' | ')}
+      </div>`:'';
+
       return `<div style="background:#0d1825;border-left:3px solid ${al.color};border-radius:4px;padding:6px 8px;margin-bottom:5px">
         <div style="display:flex;justify-content:space-between;align-items:center">
           <span style="font-size:.73rem;color:${al.color};font-weight:700">${al.name}</span>
-          <span style="font-size:.7rem;color:${used>=2?'#ef5350':used===1?'#ffd54f':'#81c784'}">${used}/2회 사용</span>
+          <span style="font-size:.7rem;color:${used>=2?'#ef5350':used===1?'#ffd54f':'#81c784'}">${used}/2회</span>
         </div>
-        <div style="font-size:.63rem;color:#888;margin-top:2px">코인 적립처: <span style="color:#ffd54f">${destLabel}</span>${directCoins>0?` | 직접보유 ${directCoins*1000/10000}만k`:''}</div>
-        ${onCooldown?`<div style="font-size:.65rem;color:#ff9800;margin-top:2px">⏳ 쿨타임 ${Math.floor(remainMin/60)}시간 ${remainMin%60}분 남음</div>`:''}
-        ${used<2&&!onCooldown&&day===2&&coinAvail?`<div style="font-size:.65rem;color:#81c784;margin-top:2px">✅ 사용 가능</div>`:''}
-        <div style="display:flex;gap:4px;margin-top:5px">
-          <button class="btn" style="flex:1;padding:3px;font-size:.65rem;background:#1a3a1a;color:#81c784"
-            onclick="useCoinChase(${i})">코인추격 사용</button>
+        <div style="font-size:.62rem;color:#888;margin-top:2px">적립처: <span style="color:#ffd54f">${destLabel}</span></div>
+        ${onCooldown?`<div style="font-size:.63rem;color:#ff9800;margin-top:2px">⏳ ${Math.floor(remainMin/60)}시간 ${remainMin%60}분 쿨타임</div>`:''}
+        ${logHtml}
+        ${stepHtml}
+        ${!coinChaseStep||coinChaseStep.alIdx!==i?`<div style="display:flex;gap:4px;margin-top:5px">
+          <button class="btn" style="flex:1;padding:3px;font-size:.65rem;
+            background:${canUse?'#1a3a1a':'#111'};color:${canUse?'#81c784':'#444'};border:1px solid ${canUse?'#2e7d32':'#222'}"
+            onclick="startCoinChase(${i})" ${canUse?'':'disabled'}>💎 코인추격 사용</button>
           <button class="btn" style="padding:3px 6px;font-size:.65rem;background:#1a1a2e;color:#666"
             onclick="resetCoinChase(${i})">초기화</button>
-        </div>
+        </div>`:''}
       </div>`;
     }).join('');
   }
@@ -1866,7 +1916,7 @@ function renderEvtTab(){
   document.getElementById('coinChaseStatus').innerHTML=coinHtml;
 }
 
-function useCoinChase(idx){
+function startCoinChase(idx){
   const al=alliances[idx];
   if((al.coinChaseUsed||0)>=2){alert('이미 2회 모두 사용했습니다.');return;}
   const now=getSimTime();
@@ -1875,20 +1925,45 @@ function useCoinChase(idx){
     const rem=Math.ceil((12*3600000-(now-lastUse))/60000);
     alert(`쿨타임 중: ${Math.floor(rem/60)}시간 ${rem%60}분 남음`);return;
   }
+  coinChaseStep={alIdx:idx,step:'target'};
+  renderEvtTab();
+}
+
+function selectCoinTarget(cityId){
+  if(!coinChaseStep) return;
+  coinChaseStep={...coinChaseStep, targetCityId:cityId, step:'result'};
+  renderEvtTab();
+}
+
+function confirmCoinChase(success){
+  if(!coinChaseStep||coinChaseStep.step!=='result') return;
+  const {alIdx,targetCityId}=coinChaseStep;
+  const al=alliances[alIdx];
+  const tc=cities.find(c=>c.id===targetCityId);
   al.coinChaseUsed=(al.coinChaseUsed||0)+1;
-  al.coinChaseLastUTC=now.toISOString();
-  const owned7=cities.filter(c=>c.owner===idx&&c.level===7);
-  if(owned7.length>0){
-    // 마지막 점령 7도시에 90k 적립
-    const lastCity=owned7.reduce((a,b)=>(a.conqueredAt||0)>(b.conqueredAt||0)?a:b);
-    lastCity.coins=(lastCity.coins||0)+90;
-  } else {
-    // 7도시 미보유 → 연맹 직접 귀속
-    al.prismCoins=(al.prismCoins||0)+90;
+  al.coinChaseLastUTC=getSimTime().toISOString();
+  if(!al.coinChaseLog) al.coinChaseLog=[];
+  al.coinChaseLog.push({target:tc?tc.label:'?', success});
+  if(success){
+    const owned7=cities.filter(c=>c.owner===alIdx&&c.level===7);
+    if(owned7.length>0){
+      const lastCity=owned7.reduce((a,b)=>(a.conqueredAt||0)>(b.conqueredAt||0)?a:b);
+      lastCity.coins=(lastCity.coins||0)+90;
+    } else {
+      al.prismCoins=(al.prismCoins||0)+90;
+    }
   }
+  coinChaseStep=null;
   renderEvtTab(); renderOcpTab();
 }
-function resetCoinChase(idx){ alliances[idx].coinChaseUsed=0; alliances[idx].coinChaseLastUTC=null; renderEvtTab(); }
+
+function resetCoinChase(idx){
+  alliances[idx].coinChaseUsed=0;
+  alliances[idx].coinChaseLastUTC=null;
+  alliances[idx].coinChaseLog=[];
+  coinChaseStep=null;
+  renderEvtTab();
+}
 
 function generateSatCoins(){
   // 토요일 UTC 00:00 — 각 7도시에 450k(=450 k단위) 적립
