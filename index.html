@@ -271,6 +271,8 @@ tr:hover td{background:rgba(34,211,238,.025)}
 }
 .posbar::before{content:'◆';color:var(--amber);font-size:.5rem;opacity:.5}
 </style>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
 </head>
 <body>
 
@@ -342,6 +344,21 @@ tr:hover td{background:rgba(34,211,238,.025)}
       data-tip="마지막 지형 삭제"
       style="background:#37474f;color:#d4dce6;border:1px solid #455a64;padding:2px 9px">↩ 지형</button>
     <span class="hint" style="margin-left:auto">클릭:건설/철거/점화 | 휠클릭:맵이동 | 휠:줌 | 영토드래그:이동 | 도시우클릭:소유권</span>
+  </div>
+  <!-- 3행: 실시간 동기화 -->
+  <div class="hdr-row" style="gap:6px;min-height:28px;padding:2px 0">
+    <span style="font-size:.6rem;color:#5a7a9a;letter-spacing:.5px">📡 전장코드:</span>
+    <input id="syncRoomInput" type="text" placeholder="예: BATTLE01" maxlength="16"
+      style="width:90px;padding:2px 6px;background:#050a14;border:1px solid #1a2e50;border-radius:2px;
+             color:#60a5fa;font-size:.72rem;font-family:'JetBrains Mono',monospace;text-transform:uppercase"
+      oninput="this.value=this.value.toUpperCase()"
+      onkeydown="if(event.key==='Enter')connectRoom(this.value)">
+    <button class="btn" onclick="connectRoom(document.getElementById('syncRoomInput').value)"
+      style="padding:2px 8px;font-size:.65rem;background:rgba(96,165,250,.1);color:#60a5fa;border-color:rgba(96,165,250,.3)">연결</button>
+    <button class="btn" onclick="disconnectRoom()"
+      style="padding:2px 8px;font-size:.65rem;background:#0d1020;color:#3a5a7a;border-color:#1a2e50">해제</button>
+    <span id="syncStatus" style="font-size:.63rem;color:#3a5a7a;font-family:'JetBrains Mono',monospace">⚫ 미연결</span>
+    <span id="syncUserCount" style="font-size:.6rem;color:#3a5a7a"></span>
   </div>
 </header>
 
@@ -1203,6 +1220,7 @@ function saveLS(){
         alliances,cities,terrains,relations
       }));
     }catch(e){}
+    syncPush();
   },800);
 }
 
@@ -2518,6 +2536,102 @@ function renderOcpTab(){
         도시 ${(r.cityScore/10000).toFixed(0)}만 + 프리즘 ${(r.prism/10000).toFixed(0)}만
       </div>
     </div>`).join('');
+}
+
+// ── Firebase 실시간 동기화 ────────────────────────────
+const _fbConfig = {
+  apiKey: "AIzaSyA3ou5tXy8Sfd6XExU1T1JUAGWc2Ju1J6o",
+  authDomain: "ir-simulator.firebaseapp.com",
+  databaseURL: "https://ir-simulator-default-rtdb.firebaseio.com",
+  projectId: "ir-simulator",
+  storageBucket: "ir-simulator.firebasestorage.app",
+  messagingSenderId: "928379717158",
+  appId: "1:928379717158:web:38655a864e2ae3599f88e7"
+};
+firebase.initializeApp(_fbConfig);
+const _fbDb = firebase.database();
+
+let _syncRoomId = null;
+let _syncRef = null;
+let _isSyncing = false;
+let _syncTimer = null;
+let _myUid = sessionStorage.getItem('war_uid') || (() => {
+  const id = Math.random().toString(36).slice(2,8).toUpperCase();
+  sessionStorage.setItem('war_uid', id);
+  return id;
+})();
+
+function connectRoom(roomId) {
+  roomId = (roomId || '').trim().toUpperCase();
+  if(!roomId) return;
+  disconnectRoom();
+  _syncRoomId = roomId;
+  _syncRef = _fbDb.ref('rooms/' + roomId + '/state');
+
+  _syncRef.on('value', snap => {
+    const data = snap.val();
+    if(!data || data._uid === _myUid) return;  // 내가 보낸 것 무시
+    _isSyncing = true;
+    try {
+      if(data.alliances) alliances = data.alliances;
+      if(data.cities)    cities    = data.cities;
+      if(data.relations) relations = data.relations;
+      if(data.waypoints) waypoints = data.waypoints;
+      if(data.terrains)  terrains  = data.terrains;
+      renderAllianceBtns(); renderCfgTab(); renderCityList(); draw();
+    } finally { _isSyncing = false; }
+    _setSyncStatus('받음');
+  });
+
+  // 접속자 heartbeat
+  const presRef = _fbDb.ref('rooms/' + roomId + '/users/' + _myUid);
+  presRef.set({t: Date.now()});
+  presRef.onDisconnect().remove();
+  _fbDb.ref('rooms/' + roomId + '/users').on('value', snap => {
+    const n = snap.numChildren();
+    const el = document.getElementById('syncUserCount');
+    if(el) el.textContent = n > 0 ? `👥 ${n}명` : '';
+  });
+
+  document.getElementById('syncRoomInput').value = roomId;
+  _setSyncStatus('연결됨');
+}
+
+function disconnectRoom() {
+  if(_syncRef) { _syncRef.off(); _syncRef = null; }
+  if(_syncRoomId) {
+    _fbDb.ref('rooms/' + _syncRoomId + '/users/' + _myUid).remove();
+    _fbDb.ref('rooms/' + _syncRoomId + '/users').off();
+  }
+  _syncRoomId = null;
+  _setSyncStatus('미연결');
+  const el = document.getElementById('syncUserCount');
+  if(el) el.textContent = '';
+}
+
+function syncPush() {
+  if(_isSyncing || !_syncRoomId) return;
+  clearTimeout(_syncTimer);
+  _syncTimer = setTimeout(() => {
+    _syncRef.set({
+      alliances, cities, relations, waypoints, terrains,
+      _uid: _myUid, _ts: Date.now()
+    }).then(() => _setSyncStatus('동기화됨')).catch(() => _setSyncStatus('오류'));
+  }, 400);
+}
+
+function _setSyncStatus(s) {
+  const el = document.getElementById('syncStatus');
+  if(!el) return;
+  const map = {
+    '연결됨':  ['🟢 연결됨',  '#4ade80'],
+    '동기화됨':['📡 동기화됨','#60a5fa'],
+    '받음':    ['⬇ 수신됨',   '#fbbf24'],
+    '미연결':  ['⚫ 미연결',   '#3a5a7a'],
+    '오류':    ['🔴 오류',     '#ef4444'],
+  };
+  const [txt, color] = map[s] || map['미연결'];
+  el.textContent = txt; el.style.color = color;
 }
 
 // ── 초기화 ────────────────────────────────────────────
