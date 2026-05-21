@@ -552,18 +552,36 @@ const CITY_QUESTS = [
   {key:'8-1', level:8, count:1, bonus:150, label:'8도시 1개 점령'},
 ];
 
-// 소유 도시 기반 실제 생산량
+// 연맹이 해당 도시에 타워/헬기장으로 실제 연결되어 있는지 확인
+function isAlConnectedToCity(alIdx, c) {
+  const al=alliances[alIdx]; if(!al) return false;
+  if(isCityConnToHelipad(c,al.helipad)) return true;
+  const connSet=getConnectedTowers(al);
+  return al.towers.some((t,ti)=>connSet.has(ti)&&isTowerConnToCity(t,c));
+}
+
+// 소유 + 연결된 도시 기반 실제 생산량
 function calcProdFromOwned(al) {
+  const alIdx=alliances.indexOf(al);
   let c6=0,c7=0,c8=0;
-  cities.forEach(c=>{ if(c.owner===al.id){ if(c.level===6)c6++; else if(c.level===7)c7++; else c8++; } });
+  cities.forEach(c=>{
+    if(c.owner===al.id && isAlConnectedToCity(alIdx,c)){
+      if(c.level===6)c6++; else if(c.level===7)c7++; else c8++;
+    }
+  });
   return calcProd(c6,c7,c8);
 }
 
 // 퀘스트 체크 및 시멘트 지급 (최초 1회)
 function checkAndApplyQuests(al) {
   if(!al.questClaimed) al.questClaimed={};
+  const alIdx=alliances.indexOf(al);
   let c6=0,c7=0,c8=0;
-  cities.forEach(c=>{ if(c.owner===al.id){ if(c.level===6)c6++; else if(c.level===7)c7++; else c8++; } });
+  cities.forEach(c=>{
+    if(c.owner===al.id && isAlConnectedToCity(alIdx,c)){
+      if(c.level===6)c6++; else if(c.level===7)c7++; else c8++;
+    }
+  });
   const cnt={6:c6,7:c7,8:c8};
   let gained=0;
   CITY_QUESTS.forEach(q=>{
@@ -679,9 +697,12 @@ const CITY_SCORES = { 6: 100000, 7: 300000, 8: 600000 };
 
 function calcScore(alIdx) {
   const al = alliances[alIdx];
-  const cityScore = cities.reduce((s, c) => s + (c.owner === alIdx ? CITY_SCORES[c.level] : 0), 0);
-  // 소유 7도시 코인(k단위) + 연맹 직접 코인(k단위)
-  const cityCoins = cities.reduce((s, c) => s + (c.owner === alIdx && c.level === 7 ? (c.coins || 0) : 0), 0);
+  // 소유 + 연결된 도시만 점수 카운트
+  const cityScore = cities.reduce((s, c) =>
+    s + (c.owner === alIdx && isAlConnectedToCity(alIdx, c) ? CITY_SCORES[c.level] : 0), 0);
+  // 소유 + 연결된 7도시 코인(k단위) + 연맹 직접 코인(k단위)
+  const cityCoins = cities.reduce((s, c) =>
+    s + (c.owner === alIdx && c.level === 7 && isAlConnectedToCity(alIdx, c) ? (c.coins || 0) : 0), 0);
   const prism = (cityCoins + (al.prismCoins || 0)) * 1000;
   return { cityScore, prism, total: cityScore + prism };
 }
