@@ -304,6 +304,10 @@ tr:hover td{background:rgba(34,211,238,.025)}
     <button class="btn btn-reset" onclick="resetTowers()"
       data-tip="현재 연맹의 타워 전체 삭제">🗑 초기화</button>
     <span class="sep">│</span>
+    <button class="btn" onclick="showRanking()"
+      data-tip="현재 점수 기준 랭킹 순위표 (동점 시 도시 점령 시각 우선)"
+      style="background:rgba(255,215,0,.08);color:#ffd700;border:1px solid rgba(255,215,0,.3);padding:3px 9px">🏆 랭킹</button>
+    <span class="sep">│</span>
     <button class="btn" id="allyModeBtn" onclick="enterAllyMode()"
       data-tip="헬기장 클릭으로 동맹 선택 → 완료"
       style="background:rgba(16,185,129,.08);color:#4ade80;border:1px solid rgba(16,185,129,.3)">🤝 동맹 설정</button>
@@ -1978,6 +1982,46 @@ function resetCoinChase(idx){
   renderEvtTab();
 }
 
+function showRanking(){
+  const medals=['🥇','🥈','🥉'];
+  // 점수 계산 + 동점 시 타이브레이커: 소유+연결 도시 중 가장 이른 conqueredAt
+  const ranked=alliances.map((al,i)=>{
+    const s=calcScore(i);
+    const connCities=cities.filter(c=>c.owner===i&&isAlConnectedToCity(i,c));
+    const earliest=connCities.reduce((m,c)=>Math.min(m,c.conqueredAt||Infinity),Infinity);
+    return {i,al,s,earliest};
+  }).sort((a,b)=>{
+    if(b.s.total!==a.s.total) return b.s.total-a.s.total;
+    return (a.earliest||Infinity)-(b.earliest||Infinity);
+  });
+
+  document.getElementById('rankingContent').innerHTML=ranked.map((r,rank)=>{
+    const connCities=cities.filter(c=>c.owner===r.i&&isAlConnectedToCity(r.i,c));
+    const cityBreakdown=connCities.length
+      ? connCities.map(c=>`<span style="color:${c.level===8?'#ff8a65':c.level===7?'#ffd54f':'#aed581'}">${c.label}</span>`).join(' ')
+      : '<span style="color:#444">없음</span>';
+    const earliestStr=r.earliest<Infinity?new Date(r.earliest).toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'}):'—';
+    return `<div style="background:#080e18;border-left:4px solid ${r.al.color};border-radius:6px;padding:10px 12px;margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+        <span style="font-size:.9rem;font-weight:700;color:${r.al.color}">${medals[rank]||`${rank+1}위`} ${r.al.name}</span>
+        <span style="font-size:.9rem;font-weight:700;color:#fff">${(r.s.total/10000).toFixed(1)}만점</span>
+      </div>
+      <div style="font-size:.68rem;color:#666;margin-bottom:3px">
+        도시 ${(r.s.cityScore/10000).toFixed(1)}만 + 프리즘 ${(r.s.prism/10000).toFixed(1)}만
+      </div>
+      <div style="font-size:.65rem;color:#555">점령 도시: ${cityBreakdown}</div>
+      ${r.earliest<Infinity?`<div style="font-size:.6rem;color:#445;margin-top:2px">최초 점령: ${earliestStr}</div>`:''}
+    </div>`;
+  }).join('');
+
+  const m=document.getElementById('rankingModal');
+  m.style.display='flex';
+}
+
+function hideRanking(){
+  document.getElementById('rankingModal').style.display='none';
+}
+
 function generateSatCoins(){
   // 토요일 UTC 00:00 — 각 7도시에 450k(=450 k단위) 적립
   cities.forEach(c=>{ if(c.level===7) c.coins=(c.coins||0)+450; });
@@ -2126,5 +2170,17 @@ setInterval(()=>{
   el.innerHTML = utc + ' UTC' + (simTime ? ' <span style="color:#ff9800;font-size:.65rem">[예측모드]</span>' : '');
 }, 1000);
 </script>
+<!-- 랭킹 모달 -->
+<div id="rankingModal" onclick="if(event.target===this)hideRanking()"
+  style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;align-items:center;justify-content:center">
+  <div style="background:#0d1825;border:1px solid #1e3a5a;border-radius:10px;padding:20px;min-width:320px;max-width:480px;width:90%;max-height:80vh;overflow-y:auto;position:relative">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <span style="font-size:1rem;font-weight:700;color:#ffd700">🏆 현재 랭킹</span>
+      <button onclick="hideRanking()" style="background:none;border:none;color:#888;font-size:1.1rem;cursor:pointer">✕</button>
+    </div>
+    <div id="rankingContent"></div>
+    <div style="font-size:.6rem;color:#444;margin-top:10px;text-align:center">동점 시 도시 최초 점령 시각 기준</div>
+  </div>
+</div>
 </body>
 </html>
