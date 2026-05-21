@@ -307,6 +307,9 @@ tr:hover td{background:rgba(34,211,238,.025)}
     <button class="btn" onclick="showRanking()"
       data-tip="현재 점수 기준 랭킹 순위표 (동점 시 도시 점령 시각 우선)"
       style="background:rgba(255,215,0,.08);color:#ffd700;border:1px solid rgba(255,215,0,.3);padding:3px 9px">🏆 랭킹</button>
+    <button class="btn" onclick="showRouteCalc()"
+      data-tip="타워 위치에서 목표 도시까지 경로와 경유 도시 계산"
+      style="background:rgba(96,165,250,.08);color:#60a5fa;border:1px solid rgba(96,165,250,.3);padding:3px 9px">🗺 경로</button>
     <span class="sep">│</span>
     <button class="btn" id="allyModeBtn" onclick="enterAllyMode()"
       data-tip="헬기장 클릭으로 동맹 선택 → 완료"
@@ -380,7 +383,7 @@ tr:hover td{background:rgba(34,211,238,.025)}
         <span>🗼 타워 규칙</span>
       </div>
       <div class="duo">
-        <div class="row"><label>건설시간<span class="suffix">(분)</span></label><input id="tBuildMin" type="number" value="45"></div>
+        <div class="row"><label>건설시간<span class="suffix">(분)</span></label><input id="tBuildMin" type="number" value="22"></div>
         <div class="row"><label>전소시간<span class="suffix">(분)</span></label><input id="tBurnMin"  type="number" value="30"></div>
       </div>
       <div class="duo">
@@ -622,13 +625,14 @@ function checkCityConn(tx, ty, connectedSet) {
 }
 
 // 연결된 도시 집합으로 분당 생산량 계산
-function calcProdFromSet(connectedSet) {
+function calcProdFromSet(connectedSet, alIdx=null) {
   let c6=0, c7=0, c8=0;
   connectedSet.forEach(ci => {
-    const lv = cities[ci]?.level;
-    if (lv===6) c6++; else if (lv===7) c7++; else if (lv===8) c8++;
+    const c=cities[ci]; if(!c) return;
+    if(alIdx!==null && c.owner!==alliances[alIdx]?.id) return;
+    if(c.level===6)c6++; else if(c.level===7)c7++; else if(c.level===8)c8++;
   });
-  return calcProd(c6, c7, c8);
+  return calcProd(c6,c7,c8);
 }
 
 // 현재 배치된 타워들로부터 연결 도시 목록 반환
@@ -1568,7 +1572,7 @@ function renderCfgTab(){
         const ownedProd=calcProdFromOwned(al);
         // 연결 도시 (타워 연결 기반 시뮬레이션)
         const conn=getConnectedCities(al.towers.length>0?al.towers:[{x:al.helipad.x+al.helipad.r/2,y:al.helipad.y-al.helipad.r/2}]);
-        const connProd=calcProdFromSet(conn);
+        const connProd=calcProdFromSet(conn,i);
         const nextCost=getTowerCost(al.towers.length+1);
         // 퀘스트 현황
         if(!al.questClaimed) al.questClaimed={};
@@ -1655,7 +1659,7 @@ function loadTemplate(e){
 // ── 계산 ──────────────────────────────────────────────
 // cem: k 단위, buildMin: 분, startTowerCount: 현재 보유 탑 수
 // 도시 연결은 자동 감지 → 생산량 동적 증가
-function calcPath(sx,sy,tx,ty,cem,buildMin,startTowerCount){
+function calcPath(sx,sy,tx,ty,cem,buildMin,startTowerCount,alIdx=null){
   const d=Math.sqrt((tx-sx)**2+(ty-sy)**2), n=Math.ceil(d/(TS+GAP));
   const towers=[]; let c=cem*1000, total=0;
   const conn=new Set(); // 연결된 도시 인덱스
@@ -1664,7 +1668,7 @@ function calcPath(sx,sy,tx,ty,cem,buildMin,startTowerCount){
   for(let i=0;i<n;i++){
     const t=(i+1)/n, x=Math.round(sx+(tx-sx)*t), y=Math.round(sy+(ty-sy)*t);
     const newC=checkCityConn(x,y,conn);
-    const p=calcProdFromSet(conn);
+    const p=calcProdFromSet(conn,alIdx);
     const cost=getTowerCost(startTowerCount+i+1);
     const ca=c+p*buildMin, wait=Math.max(0,cost-ca)/p;
     total+=buildMin+wait; c=ca-cost+p*wait;
@@ -1673,13 +1677,13 @@ function calcPath(sx,sy,tx,ty,cem,buildMin,startTowerCount){
   return {towers,total};
 }
 
-function calcFromPlaced(placed,cem,buildMin,startTowerCount,startX,startY){
+function calcFromPlaced(placed,cem,buildMin,startTowerCount,startX,startY,alIdx=null){
   let c=cem*1000, total=0;
   const conn=new Set();
   checkCityConn(startX,startY,conn);
   const towers=placed.map((pt,i)=>{
     const newC=checkCityConn(pt.x,pt.y,conn);
-    const p=calcProdFromSet(conn);
+    const p=calcProdFromSet(conn,alIdx);
     const cost=getTowerCost(startTowerCount+i+1);
     const ca=c+p*buildMin, wait=Math.max(0,cost-ca)/p;
     total+=buildMin+wait; c=ca-cost+p*wait;
@@ -1690,10 +1694,10 @@ function calcFromPlaced(placed,cem,buildMin,startTowerCount,startX,startY){
 
 function runSim(){
   const tx=G('tgtX'),ty=G('tgtY'),bm=G('tBuildMin');
-  const results=alliances.map(al=>{
+  const results=alliances.map((al,i)=>{
     const res=al.towers.length>0
-      ?calcFromPlaced(al.towers,al.cement,bm,al.towers.length,al.helipad.x+al.helipad.r/2,al.helipad.y-al.helipad.r/2)
-      :calcPath(al.helipad.x+al.helipad.r/2,al.helipad.y-al.helipad.r/2,tx,ty,al.cement,bm,al.towers.length);
+      ?calcFromPlaced(al.towers,al.cement,bm,al.towers.length,al.helipad.x+al.helipad.r/2,al.helipad.y-al.helipad.r/2,i)
+      :calcPath(al.helipad.x+al.helipad.r/2,al.helipad.y-al.helipad.r/2,tx,ty,al.cement,bm,al.towers.length,i);
     return {al,res};
   });
   lastSimResults=results;
@@ -2080,6 +2084,116 @@ function hideRanking(){
   document.getElementById('rankingModal').style.display='none';
 }
 
+function showRouteCalc(){
+  const alSel=document.getElementById('routeAl');
+  alSel.innerHTML=alliances.map((al,i)=>`<option value="${i}" style="color:${al.color}">${al.name}</option>`).join('');
+  updateRouteSelects();
+  alSel.onchange=updateRouteSelects;
+  document.getElementById('routeModal').style.display='flex';
+}
+
+function updateRouteSelects(){
+  const alIdx=+document.getElementById('routeAl').value;
+  const al=alliances[alIdx]; if(!al) return;
+  const fromSel=document.getElementById('routeFrom');
+  fromSel.innerHTML=`<option value="helipad">🚁 헬기장 (${al.helipad.x+al.helipad.r/2|0}, ${al.helipad.y-al.helipad.r/2|0})</option>`
+    +al.towers.map((t,i)=>`<option value="tower_${i}">타워 #${i+1} (${t.x}, ${t.y})</option>`).join('');
+  const toSel=document.getElementById('routeTo');
+  toSel.innerHTML=cities.map((c,i)=>`<option value="${i}">${c.label} (${c.x+c.r/2|0}, ${c.y-c.r/2|0})</option>`).join('');
+}
+
+function calcRoute(){
+  const alIdx=+document.getElementById('routeAl').value;
+  const al=alliances[alIdx]; if(!al) return;
+  const fromVal=document.getElementById('routeFrom').value;
+  const toIdx=+document.getElementById('routeTo').value;
+  const bm=+document.getElementById('routeBuildMin').value||22;
+  const dest=cities[toIdx]; if(!dest) return;
+
+  let sx,sy;
+  if(fromVal==='helipad'){ sx=al.helipad.x+al.helipad.r/2; sy=al.helipad.y-al.helipad.r/2; }
+  else { const ti=+fromVal.split('_')[1]; const t=al.towers[ti]; sx=t.x; sy=t.y; }
+
+  const tx=dest.x+dest.r/2, ty=dest.y-dest.r/2;
+  const dist=Math.sqrt((tx-sx)**2+(ty-sy)**2);
+  const n=Math.ceil(dist/(TS+GAP));
+  const startCount=fromVal==='helipad'?al.towers.length:(+fromVal.split('_')[1]+1);
+
+  const waypointCities=[];
+  cities.forEach((c,ci)=>{
+    if(ci===toIdx) return;
+    const cx2=c.x+c.r/2, cy2=c.y-c.r/2;
+    const dx=tx-sx, dy=ty-sy, len=Math.sqrt(dx*dx+dy*dy);
+    if(len===0) return;
+    const t2=Math.max(0,Math.min(1,((cx2-sx)*dx+(cy2-sy)*dy)/(len*len)));
+    const projX=sx+t2*dx, projY=sy+t2*dy;
+    const d2=Math.sqrt((cx2-projX)**2+(cy2-projY)**2);
+    if(d2<(TS+GAP)*2) waypointCities.push({c,ci,t:t2});
+  });
+  waypointCities.sort((a,b)=>a.t-b.t);
+
+  const conn=new Set();
+  checkCityConn(sx,sy,conn);
+  let cem=al.cement*1000, total=0;
+  const steps=[];
+  for(let i=0;i<n;i++){
+    const frac=(i+1)/n;
+    const x=Math.round(sx+(tx-sx)*frac), y=Math.round(sy+(ty-sy)*frac);
+    const newC=checkCityConn(x,y,conn);
+    const p=calcProdFromSet(conn,alIdx);
+    const cost=getTowerCost(startCount+i+1);
+    const ca=cem+p*bm, wait=Math.max(0,cost-ca)/p;
+    total+=bm+wait; cem=ca-cost+p*wait;
+    steps.push({num:startCount+i+1,x,y,cost,wait,total,cem,prod:p,newCities:newC});
+  }
+
+  const totalH=(total/60).toFixed(1);
+  const wc=waypointCities.map(w=>`<span style="color:${w.c.level===8?'#ff8a65':w.c.level===7?'#ffd54f':'#aed581'}">${w.c.label}</span>`).join(' → ');
+
+  let html=`<div style="background:#080e18;border-radius:6px;padding:10px;margin-bottom:8px">
+    <div style="font-size:.75rem;color:#60a5fa;margin-bottom:4px">
+      📍 ${fromVal==='helipad'?'헬기장':('타워 #'+(+fromVal.split('_')[1]+1))} → ${dest.label}
+    </div>
+    <div style="font-size:.7rem;color:#aaa">거리: ${dist.toFixed(0)}칸 | 필요 타워: <b style="color:#fff">${n}개</b> | 예상시간: <b style="color:#4ade80">${totalH}시간</b></div>
+    ${wc?`<div style="font-size:.68rem;color:#888;margin-top:4px">경유 도시: ${wc} → <span style="color:#60a5fa">${dest.label}</span></div>`:''}
+  </div>
+  <div style="overflow-x:auto">
+  <table style="width:100%;border-collapse:collapse;font-size:.65rem">
+    <thead><tr style="color:#666;border-bottom:1px solid #1e3a5a">
+      <th style="padding:3px 5px;text-align:left">타워</th>
+      <th style="padding:3px 5px">좌표</th>
+      <th style="padding:3px 5px">비용</th>
+      <th style="padding:3px 5px">대기</th>
+      <th style="padding:3px 5px">누적</th>
+      <th style="padding:3px 5px">생산량</th>
+      <th style="padding:3px 5px">경유</th>
+    </tr></thead><tbody>
+    ${steps.map((s,i)=>{
+      const cityBadges=s.newCities.map(ci=>{
+        const c=cities[ci];
+        return `<span style="color:${c.level===8?'#ff8a65':c.level===7?'#ffd54f':'#aed581'}">${c.label}</span>`;
+      }).join(' ');
+      const isLast=i===steps.length-1;
+      return `<tr style="border-bottom:1px solid #0d1825;${isLast?'background:#0d2040':''}">
+        <td style="padding:3px 5px;color:#60a5fa">#${s.num}</td>
+        <td style="padding:3px 5px;color:#888;text-align:center">${s.x},${s.y}</td>
+        <td style="padding:3px 5px;color:#ef9a9a;text-align:center">${(s.cost/1000).toFixed(0)}k</td>
+        <td style="padding:3px 5px;color:${s.wait>0?'#ff9800':'#4ade80'};text-align:center">${s.wait>0?(s.wait/60).toFixed(1)+'h':'즉시'}</td>
+        <td style="padding:3px 5px;color:#fff;text-align:center">${(s.total/60).toFixed(1)}h</td>
+        <td style="padding:3px 5px;color:#4ade80;text-align:center">${s.prod}/분</td>
+        <td style="padding:3px 5px">${cityBadges}</td>
+      </tr>`;
+    }).join('')}
+    </tbody>
+  </table></div>`;
+
+  document.getElementById('routeResult').innerHTML=html;
+}
+
+function hideRouteCalc(){
+  document.getElementById('routeModal').style.display='none';
+}
+
 function generateSatCoins(){
   // 토요일 UTC 00:00 — 각 7도시에 450k(=450 k단위) 적립
   cities.forEach(c=>{ if(c.level===7) c.coins=(c.coins||0)+450; });
@@ -2257,6 +2371,40 @@ setInterval(()=>{
   el.innerHTML = utc + ' UTC' + (simTime ? ' <span style="color:#ff9800;font-size:.65rem">[예측모드]</span>' : '');
 }, 1000);
 </script>
+<!-- 경로 계산 모달 -->
+<div id="routeModal" onclick="if(event.target===this)hideRouteCalc()"
+  style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;align-items:center;justify-content:center">
+  <div style="background:#0d1825;border:1px solid #1e3a5a;border-radius:10px;padding:20px;min-width:340px;max-width:520px;width:92%;max-height:85vh;overflow-y:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <span style="font-size:1rem;font-weight:700;color:#60a5fa">🗺 경로 계산</span>
+      <button onclick="hideRouteCalc()" style="background:none;border:none;color:#888;font-size:1.1rem;cursor:pointer">✕</button>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px">
+      <div style="display:flex;gap:6px;align-items:center">
+        <span style="font-size:.72rem;color:#888;min-width:50px">연맹</span>
+        <select id="routeAl" style="flex:1;background:#0d1b2e;border:1px solid #334;border-radius:4px;color:#eee;padding:3px 6px;font-size:.75rem">
+        </select>
+      </div>
+      <div style="display:flex;gap:6px;align-items:center">
+        <span style="font-size:.72rem;color:#888;min-width:50px">출발</span>
+        <select id="routeFrom" style="flex:1;background:#0d1b2e;border:1px solid #334;border-radius:4px;color:#eee;padding:3px 6px;font-size:.75rem">
+        </select>
+      </div>
+      <div style="display:flex;gap:6px;align-items:center">
+        <span style="font-size:.72rem;color:#888;min-width:50px">목적지</span>
+        <select id="routeTo" style="flex:1;background:#0d1b2e;border:1px solid #334;border-radius:4px;color:#eee;padding:3px 6px;font-size:.75rem">
+        </select>
+      </div>
+      <div style="display:flex;gap:6px;align-items:center">
+        <span style="font-size:.72rem;color:#888;min-width:50px">건설(분)</span>
+        <input id="routeBuildMin" type="number" value="22" min="1"
+          style="width:70px;background:#0d1b2e;border:1px solid #334;border-radius:4px;color:#eee;padding:3px 6px;font-size:.75rem">
+      </div>
+      <button onclick="calcRoute()" style="background:#1a3a5a;color:#60a5fa;border:1px solid #1e4a7a;border-radius:5px;padding:7px;font-size:.8rem;cursor:pointer;font-weight:700">▶ 경로 계산</button>
+    </div>
+    <div id="routeResult"></div>
+  </div>
+</div>
 <!-- 랭킹 모달 -->
 <div id="rankingModal" onclick="if(event.target===this)hideRanking()"
   style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;align-items:center;justify-content:center">
