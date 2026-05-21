@@ -359,8 +359,67 @@ tr:hover td{background:rgba(34,211,238,.025)}
       style="padding:2px 8px;font-size:.65rem;background:#0d1020;color:#3a5a7a;border-color:#1a2e50">해제</button>
     <span id="syncStatus" style="font-size:.63rem;color:#3a5a7a;font-family:'JetBrains Mono',monospace">⚫ 미연결</span>
     <span id="syncUserCount" style="font-size:.6rem;color:#3a5a7a"></span>
+    <button class="btn" onclick="showHelp()"
+      style="margin-left:auto;padding:2px 8px;font-size:.68rem;background:rgba(255,255,255,.05);color:#5a7a9a;border-color:#1a2e50;border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-weight:bold">?</button>
   </div>
 </header>
+
+<!-- 도움말 모달 -->
+<div id="helpModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9000;overflow:auto">
+  <div style="max-width:680px;margin:40px auto;background:#0d1117;border:1px solid #1a2e50;border-radius:6px;padding:24px;color:#c9d1d9;font-size:.82rem;line-height:1.6">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <h2 style="margin:0;color:#60a5fa;font-size:1rem">⚔️ IR 시뮬레이터 사용법</h2>
+      <button onclick="document.getElementById('helpModal').style.display='none'"
+        style="background:none;border:none;color:#5a7a9a;font-size:1.2rem;cursor:pointer">✕</button>
+    </div>
+
+    <h3 style="color:#4ade80;font-size:.8rem;margin:12px 0 6px">▶ 빠른 시작</h3>
+    <ol style="margin:0 0 12px;padding-left:18px">
+      <li>헤더에서 내 <b>연맹 버튼</b> 선택</li>
+      <li><b>🔨 건설</b> 클릭 → 맵에서 타워 위치 클릭</li>
+      <li><b>▶ 계산</b> 클릭 → 오른쪽 <b>📊 탭</b>에서 결과 확인</li>
+    </ol>
+
+    <h3 style="color:#4ade80;font-size:.8rem;margin:12px 0 6px">🖱 맵 조작</h3>
+    <table style="width:100%;border-collapse:collapse;margin-bottom:12px">
+      <tr style="background:#111827"><td style="padding:3px 8px;border:1px solid #1a2e50;color:#a8d8ff">왼쪽 클릭</td><td style="padding:3px 8px;border:1px solid #1a2e50">현재 모드로 타워 건설·철거·점화</td></tr>
+      <tr><td style="padding:3px 8px;border:1px solid #1a2e50;color:#a8d8ff">우클릭</td><td style="padding:3px 8px;border:1px solid #1a2e50">경로 모드: 경유지 추가/삭제 / 도시: 소유권 변경</td></tr>
+      <tr style="background:#111827"><td style="padding:3px 8px;border:1px solid #1a2e50;color:#a8d8ff">마우스 휠</td><td style="padding:3px 8px;border:1px solid #1a2e50">줌인·줌아웃</td></tr>
+      <tr><td style="padding:3px 8px;border:1px solid #1a2e50;color:#a8d8ff">휠 클릭 드래그</td><td style="padding:3px 8px;border:1px solid #1a2e50">맵 뷰 이동</td></tr>
+      <tr style="background:#111827"><td style="padding:3px 8px;border:1px solid #1a2e50;color:#a8d8ff">타워 드래그</td><td style="padding:3px 8px;border:1px solid #1a2e50">타워 위치 이동</td></tr>
+    </table>
+
+    <h3 style="color:#4ade80;font-size:.8rem;margin:12px 0 6px">🔘 헤더 버튼</h3>
+    <table style="width:100%;border-collapse:collapse;margin-bottom:12px">
+      <tr style="background:#111827"><td style="padding:3px 8px;border:1px solid #1a2e50;color:#a8d8ff;white-space:nowrap">🔨 건설</td><td style="padding:3px 8px;border:1px solid #1a2e50">클릭 위치에 타워 건설 (시멘트 소모)</td></tr>
+      <tr><td style="padding:3px 8px;border:1px solid #1a2e50;color:#a8d8ff">🔧 철거</td><td style="padding:3px 8px;border:1px solid #1a2e50">타워 클릭으로 즉시 삭제</td></tr>
+      <tr style="background:#111827"><td style="padding:3px 8px;border:1px solid #1a2e50;color:#a8d8ff">🔥 점화</td><td style="padding:3px 8px;border:1px solid #1a2e50">타워 클릭 → 내구도 초당 감소 시작</td></tr>
+      <tr><td style="padding:3px 8px;border:1px solid #1a2e50;color:#a8d8ff">↩ 취소</td><td style="padding:3px 8px;border:1px solid #1a2e50">마지막 건설 타워 삭제</td></tr>
+      <tr style="background:#111827"><td style="padding:3px 8px;border:1px solid #1a2e50;color:#a8d8ff">🗺 경로</td><td style="padding:3px 8px;border:1px solid #1a2e50">경유지 깃발 모드 — 우클릭 추가, 재우클릭 삭제, 드래그 이동</td></tr>
+      <tr><td style="padding:3px 8px;border:1px solid #1a2e50;color:#a8d8ff">🤝 동맹 설정</td><td style="padding:3px 8px;border:1px solid #1a2e50">헬기장 클릭으로 동맹 연맹 선택 → ✓ 완료</td></tr>
+      <tr style="background:#111827"><td style="padding:3px 8px;border:1px solid #1a2e50;color:#a8d8ff">🏆 랭킹</td><td style="padding:3px 8px;border:1px solid #1a2e50">현재 점수 기준 순위표 팝업</td></tr>
+      <tr><td style="padding:3px 8px;border:1px solid #1a2e50;color:#a8d8ff">🗑 초기화</td><td style="padding:3px 8px;border:1px solid #1a2e50">전체 데이터 삭제 + 새로고침</td></tr>
+    </table>
+
+    <h3 style="color:#4ade80;font-size:.8rem;margin:12px 0 6px">📡 실시간 동기화 (전장코드)</h3>
+    <ol style="margin:0 0 12px;padding-left:18px">
+      <li>헤더 하단 전장코드 입력 (예: <code style="background:#111827;padding:1px 4px;border-radius:2px">BATTLE01</code>)</li>
+      <li><b>연결</b> 클릭 → 🟢 연결됨 확인</li>
+      <li>연맹원도 동일 코드로 연결 → 맵 수정 시 자동 공유</li>
+    </ol>
+
+    <h3 style="color:#4ade80;font-size:.8rem;margin:12px 0 6px">📋 탭 패널 (우측)</h3>
+    <table style="width:100%;border-collapse:collapse;margin-bottom:4px">
+      <tr style="background:#111827"><td style="padding:3px 8px;border:1px solid #1a2e50;color:#ffd700">🗺</td><td style="padding:3px 8px;border:1px solid #1a2e50">맵 크기·건설시간·목표 좌표 설정</td></tr>
+      <tr><td style="padding:3px 8px;border:1px solid #1a2e50;color:#ffd700">⚙</td><td style="padding:3px 8px;border:1px solid #1a2e50">연맹별 시멘트·분당생산량 설정</td></tr>
+      <tr style="background:#111827"><td style="padding:3px 8px;border:1px solid #1a2e50;color:#ffd700">🤝</td><td style="padding:3px 8px;border:1px solid #1a2e50">연맹 간 동맹·중립·적대 관계 매트릭스</td></tr>
+      <tr><td style="padding:3px 8px;border:1px solid #1a2e50;color:#ffd700">🏙</td><td style="padding:3px 8px;border:1px solid #1a2e50">도시 점령 현황·예상 점수</td></tr>
+      <tr style="background:#111827"><td style="padding:3px 8px;border:1px solid #1a2e50;color:#ffd700">⏰</td><td style="padding:3px 8px;border:1px solid #1a2e50">전장 일정·UTC 시간·코인추격 쿨타임</td></tr>
+      <tr><td style="padding:3px 8px;border:1px solid #1a2e50;color:#ffd700">🔥</td><td style="padding:3px 8px;border:1px solid #1a2e50">점화 타워 전소까지 남은 시간 계산</td></tr>
+      <tr style="background:#111827"><td style="padding:3px 8px;border:1px solid #1a2e50;color:#ffd700">📊</td><td style="padding:3px 8px;border:1px solid #1a2e50">도달 시간·충돌 예측·경로 계산 결과</td></tr>
+    </table>
+  </div>
+</div>
 
 <div class="main">
   <div class="map-wrap" id="mapWrap"><canvas id="map"></canvas></div>
@@ -1868,6 +1927,10 @@ function renderTableStr(towers){
 }
 
 function resetTowers(){ alliances.forEach(al=>al.towers=[]); draw(); }
+
+function showHelp(){
+  document.getElementById('helpModal').style.display='block';
+}
 
 function fullReset(){
   if(!confirm('모든 데이터를 초기 상태로 되돌립니다.\n(타워, 경유지, 도시 점령, 동맹 관계, 저장값 전체 삭제)\n\n계속하시겠습니까?')) return;
