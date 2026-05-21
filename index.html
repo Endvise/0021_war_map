@@ -301,8 +301,8 @@ tr:hover td{background:rgba(34,211,238,.025)}
     <span class="sep">│</span>
     <button class="btn btn-calc" onclick="runSim()"
       data-tip="모든 연맹 경로·도달 시간 계산">▶ 계산</button>
-    <button class="btn btn-reset" onclick="resetTowers()"
-      data-tip="현재 연맹의 타워 전체 삭제">🗑 초기화</button>
+    <button class="btn btn-reset" onclick="fullReset()"
+      data-tip="모든 데이터 초기화 — 타워·경유지·도시점령·동맹관계·저장값 전체 삭제">🗑 초기화</button>
     <span class="sep">│</span>
     <button class="btn" onclick="showRanking()"
       data-tip="현재 점수 기준 랭킹 순위표 (동점 시 도시 점령 시각 우선)"
@@ -1065,7 +1065,20 @@ function drawGhost(){
 function drawWaypoints(){
   if(!waypoints.length) return;
   ctx.save();
-  // 연결선
+  // 출발점 → 첫 경유지 연결선
+  const al=alliances[activeIdx];
+  if(al){
+    let sx,sy;
+    if(al.towers.length>0){const lt=al.towers[al.towers.length-1];sx=lt.x;sy=lt.y;}
+    else{sx=al.helipad.x+al.helipad.r/2;sy=al.helipad.y-al.helipad.r/2;}
+    const {cx:ocx,cy:ocy}=toC(sx,sy);
+    const {cx:fcx,cy:fcy}=toC(waypoints[0].x,waypoints[0].y);
+    ctx.strokeStyle='rgba(96,165,250,0.3)';
+    ctx.lineWidth=1.5; ctx.setLineDash([3,4]);
+    ctx.beginPath(); ctx.moveTo(ocx,ocy); ctx.lineTo(fcx,fcy); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+  // 경유지 간 연결선
   ctx.strokeStyle='rgba(96,165,250,0.5)';
   ctx.lineWidth=1.5; ctx.setLineDash([5,3]);
   ctx.beginPath();
@@ -1395,7 +1408,7 @@ canvas.addEventListener('mousemove',e=>{
 canvas.addEventListener('mouseup',e=>{
   if(e.button!==0) return;
   if(towerMode==='route'){
-    draggingWpIdx=null;
+    if(draggingWpIdx!==null){ draggingWpIdx=null; draw(); calcWaypointRoute(); }
     canvas.style.cursor='crosshair';
     return;
   }
@@ -1458,7 +1471,7 @@ canvas.addEventListener('contextmenu',e=>{
     const wi=findNearestWaypoint(raw.x,raw.y);
     if(wi>=0) waypoints.splice(wi,1);
     else waypoints.push({x:Math.round(raw.x),y:Math.round(raw.y)});
-    draw(); return;
+    draw(); calcWaypointRoute(); return;
   }
   const hit=hitTest(raw.x,raw.y);
   if(hit&&hit.type==='helipad'){
@@ -1837,6 +1850,12 @@ function renderTableStr(towers){
 }
 
 function resetTowers(){ alliances.forEach(al=>al.towers=[]); draw(); }
+
+function fullReset(){
+  if(!confirm('모든 데이터를 초기 상태로 되돌립니다.\n(타워, 경유지, 도시 점령, 동맹 관계, 저장값 전체 삭제)\n\n계속하시겠습니까?')) return;
+  localStorage.removeItem('war_map_v2');
+  location.reload();
+}
 
 function findNearestTower(towers, x, y) {
   let best=-1, bestD=Infinity;
@@ -2277,6 +2296,96 @@ function calcRouteAt(rawX, rawY){
   // 📊 탭에 결과 표시 후 탭 전환
   document.getElementById('tabRes').innerHTML=
     `<div style="font-size:.62rem;color:#3a6080;margin-bottom:6px;font-family:'JetBrains Mono',monospace">🗺 경로모드 — 우클릭으로 재계산</div>`+html;
+  const resBtn=[...document.querySelectorAll('.tab')].find(t=>t.getAttribute('onclick')?.includes("'res'"));
+  if(resBtn) showTab('res',resBtn);
+}
+
+function calcWaypointRoute(){
+  if(!waypoints.length) return;
+  const al=alliances[activeIdx]; if(!al) return;
+  const bm=G('tBuildMin')||23;
+  const effBm=getEffBuildMin(al,bm);
+
+  // 출발점
+  let curX,curY,startCount,fromLabel;
+  if(al.towers.length>0){
+    const lt=al.towers[al.towers.length-1];
+    curX=lt.x; curY=lt.y; startCount=al.towers.length; fromLabel=`타워 #${al.towers.length}`;
+  } else {
+    curX=al.helipad.x+al.helipad.r/2; curY=al.helipad.y-al.helipad.r/2;
+    startCount=0; fromLabel='헬기장';
+  }
+
+  const skillActive=al.infraSkillEnd&&Date.now()<al.infraSkillEnd;
+  const conn=new Set();
+  checkCityConn(curX,curY,conn);
+  let cem=al.cement*1000, total=0, towerNum=startCount;
+  const segments=[];
+
+  waypoints.forEach((wp,wpi)=>{
+    const tx=wp.x, ty=wp.y;
+    const dist=Math.sqrt((tx-curX)**2+(ty-curY)**2);
+    const n=Math.ceil(dist/(TS+GAP));
+    const steps=[];
+    for(let i=0;i<n;i++){
+      const frac=(i+1)/n;
+      const x=Math.round(curX+(tx-curX)*frac), y=Math.round(curY+(ty-curY)*frac);
+      const newC=checkCityConn(x,y,conn);
+      const p=calcProdFromSet(conn,activeIdx);
+      const cost=getTowerCost(towerNum+1);
+      const ca=cem+p*effBm, wait=Math.max(0,cost-ca)/p;
+      total+=effBm+wait; cem=ca-cost+p*wait; towerNum++;
+      steps.push({num:towerNum,x,y,cost,wait,total,cem,prod:p,newCities:newC});
+    }
+    segments.push({wpi,steps,dist});
+    curX=tx; curY=ty;
+  });
+
+  const totalH=(total/60).toFixed(1);
+  const totalTowers=segments.reduce((s,g)=>s+g.steps.length,0);
+
+  let html=`<div style="background:#080e18;border-radius:6px;padding:10px;margin-bottom:8px">
+    <div style="font-size:.75rem;color:${al.color};font-weight:700;margin-bottom:4px">
+      ${al.name} — ${fromLabel} → 경유지 ${waypoints.length}개</div>
+    ${skillActive?`<div style="font-size:.65rem;color:#fb923c;margin-bottom:3px">🏗 인프라스킬 활성 — 건설 ${effBm.toFixed(1)}분</div>`:''}
+    <div style="font-size:.7rem;color:#aaa">총 타워: <b style="color:#fff">${totalTowers}개</b> | 예상: <b style="color:#4ade80">${totalH}시간</b></div>
+  </div>`;
+
+  segments.forEach((seg,si)=>{
+    if(!seg.steps.length) return;
+    const segTotalH=(seg.steps[seg.steps.length-1].total/60).toFixed(1);
+    html+=`<div style="font-size:.68rem;color:#60a5fa;margin:6px 0 3px;font-weight:700">
+      🏴 경유지 ${si+1} &nbsp;<span style="color:#3a6080;font-weight:400">거리 ${seg.dist.toFixed(0)}칸 · 누적 ${segTotalH}h</span>
+    </div>
+    <div style="overflow-x:auto;margin-bottom:6px">
+    <table style="width:100%;border-collapse:collapse;font-size:.63rem">
+      <thead><tr style="color:#666;border-bottom:1px solid #1e3a5a">
+        <th style="padding:2px 4px;text-align:left">타워</th>
+        <th style="padding:2px 4px">좌표</th>
+        <th style="padding:2px 4px">비용</th>
+        <th style="padding:2px 4px">대기</th>
+        <th style="padding:2px 4px">누적</th>
+        <th style="padding:2px 4px">생산</th>
+        <th style="padding:2px 4px">경유도시</th>
+      </tr></thead><tbody>
+      ${seg.steps.map((s,i)=>{
+        const badges=s.newCities.map(ci=>{const c=cities[ci];return `<span style="color:${c.level===8?'#ff8a65':c.level===7?'#ffd54f':'#aed581'}">${c.label}</span>`;}).join(' ');
+        const isLast=i===seg.steps.length-1;
+        return `<tr style="border-bottom:1px solid #0d1825;${isLast?'background:#0d2040':''}">
+          <td style="padding:2px 4px;color:#60a5fa">#${s.num}</td>
+          <td style="padding:2px 4px;color:#888;text-align:center">${s.x},${s.y}</td>
+          <td style="padding:2px 4px;color:#ef9a9a;text-align:center">${(s.cost/1000).toFixed(0)}k</td>
+          <td style="padding:2px 4px;color:${s.wait>0?'#ff9800':'#4ade80'};text-align:center">${s.wait>0?(s.wait/60).toFixed(1)+'h':'즉시'}</td>
+          <td style="padding:2px 4px;color:#fff;text-align:center">${(s.total/60).toFixed(1)}h</td>
+          <td style="padding:2px 4px;color:#4ade80;text-align:center">${s.prod}/분</td>
+          <td style="padding:2px 4px">${badges}</td>
+        </tr>`;
+      }).join('')}
+      </tbody></table></div>`;
+  });
+
+  document.getElementById('tabRes').innerHTML=
+    `<div style="font-size:.62rem;color:#3a6080;margin-bottom:6px;font-family:'JetBrains Mono',monospace">🗺 경로모드 — 우클릭 경유지 추가/제거 · 드래그 이동</div>`+html;
   const resBtn=[...document.querySelectorAll('.tab')].find(t=>t.getAttribute('onclick')?.includes("'res'"));
   if(resBtn) showTab('res',resBtn);
 }
