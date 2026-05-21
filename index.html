@@ -599,22 +599,23 @@ const isConn = (a,b) => {
   return (dx<TS && Math.max(0,dy-TS)<=GAP) || (dy<TS && Math.max(0,dx-TS)<=GAP);
 };
 // 타워 ↔ 헬기장 연결
+// r=15 → center 소수점(X.5) + 정수 타워center = 반정수 dx → Math.round로 서브픽셀 오인 방지
 function isConnToHelipad(t,h){
   const hcx=h.x+h.r/2, hcy=h.y-h.r/2, hs=TS/2+h.r/2;
-  const dx=Math.abs(t.x-hcx), dy=Math.abs(t.y-hcy);
+  const dx=Math.round(Math.abs(t.x-hcx)), dy=Math.round(Math.abs(t.y-hcy));
   return (dx<hs && Math.max(0,dy-hs)<=GAP) || (dy<hs && Math.max(0,dx-hs)<=GAP);
 }
 // 타워 ↔ 도시 영토 연결 (no corner touch)
 function isTowerConnToCity(t,c){
   const ccx=c.x+c.r/2, ccy=c.y-c.r/2;
-  const adx=Math.abs(t.x-ccx), ady=Math.abs(t.y-ccy), hs=TS/2+c.r/2;
+  const adx=Math.round(Math.abs(t.x-ccx)), ady=Math.round(Math.abs(t.y-ccy)), hs=TS/2+c.r/2;
   return (adx<hs && Math.max(0,ady-hs)<=GAP) || (ady<hs && Math.max(0,adx-hs)<=GAP);
 }
 // 도시 ↔ 헬기장 영토 연결
 function isCityConnToHelipad(c,h){
   const hcx=h.x+h.r/2, hcy=h.y-h.r/2;
   const ccx=c.x+c.r/2, ccy=c.y-c.r/2;
-  const adx=Math.abs(ccx-hcx), ady=Math.abs(ccy-hcy), hs=h.r/2+c.r/2;
+  const adx=Math.round(Math.abs(ccx-hcx)), ady=Math.round(Math.abs(ccy-hcy)), hs=h.r/2+c.r/2;
   return (adx<hs && Math.max(0,ady-hs)<=GAP) || (ady<hs && Math.max(0,adx-hs)<=GAP);
 }
 // 이 연맹이 도시를 브릿지로 사용할 수 있는지 (미점령이거나 자기 소유)
