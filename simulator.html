@@ -79,7 +79,6 @@ td{padding:2px 3px;text-align:center;border-bottom:1px solid #1e3040}
   <h1>⚔️ SLG 시뮬레이터</h1>
   <span class="sep">│</span>
   <div id="allianceBtns"></div>
-  <button class="btn btn-add" onclick="addAlliance()">+ 연맹</button>
   <span class="sep">│</span>
   <div id="towerModeBtns" style="display:flex;gap:3px">
     <button class="btn" id="tmBuild"  onclick="setTowerMode('build')"
@@ -91,6 +90,20 @@ td{padding:2px 3px;text-align:center;border-bottom:1px solid #1e3040}
   </div>
   <button class="btn" onclick="undoTower()"
     style="background:#37474f;color:#ccc;border:1px solid #455a64;padding:4px 9px">↩ 취소</button>
+  <span class="sep">│</span>
+  <span style="font-size:.68rem;color:#888">지형:</span>
+  <div id="terrainModeBtns" style="display:flex;gap:3px">
+    <button class="btn" id="tmRiver"    onclick="setTerrainMode('river')"
+      style="background:#1a2a3a;color:#42a5f5;border:1px solid #334;padding:4px 8px">🌊 강</button>
+    <button class="btn" id="tmBridge"   onclick="setTerrainMode('bridge')"
+      style="background:#1a2a3a;color:#8d6e63;border:1px solid #334;padding:4px 8px">🌉 다리</button>
+    <button class="btn" id="tmMountain" onclick="setTerrainMode('mountain')"
+      style="background:#1a2a3a;color:#90a4ae;border:1px solid #334;padding:4px 8px">⛰ 산</button>
+    <button class="btn" id="tmTerrainOff" onclick="setTerrainMode(null)"
+      style="background:#455a64;color:#ccc;border:1px solid #546e7a;padding:4px 8px">OFF</button>
+  </div>
+  <button class="btn" onclick="undoTerrain()"
+    style="background:#37474f;color:#ccc;border:1px solid #455a64;padding:4px 9px">↩ 지형</button>
   <span class="sep">│</span>
   <button class="btn btn-calc"  onclick="runSim()">▶ 계산</button>
   <button class="btn btn-reset" onclick="resetTowers()">🗑 초기화</button>
@@ -324,7 +337,7 @@ let alIdSeq   = 8;
 let activeIdx = 0;
 let towerMode = 'build'; // 'build' | 'demolish' | 'ignite'
 
-const TOWER_DEFAULTS = { maxHp:7200, burnRatePerSec:5, burnDurationSec:600 };
+const TOWER_DEFAULTS = { maxHp:7200, burnRatePerSec:5, burnDurationSec:900 };
 
 function setTowerMode(m) {
   towerMode = m;
@@ -399,6 +412,8 @@ let drag={}, isDragging=false;
 
 // ── 동맹 관계 ─────────────────────────────────────────
 let relations = {};
+let lastSimResults = [], lastCollisions = [];
+let _lsTimer = null;
 function relKey(i,j){ return i<j?`${i}-${j}`:`${j}-${i}`; }
 function getRel(i,j){ return relations[relKey(i,j)]||'neutral'; }
 function setRel(i,j,v){ relations[relKey(i,j)]=v; renderRelTab(); draw(); }
@@ -412,6 +427,7 @@ function clearSimTime(){ simTime=null; document.getElementById('simTimeInput').v
 
 // ── 전소 타워 목록 ────────────────────────────────────
 let burnTowers=[], burnIdSeq=0;
+let terrains=[], terrainIdSeq=0, terrainMode=null, drawingTerrain=null;
 
 function hitTest(gx,gy) {
   for (let i=0;i<alliances.length;i++) {
@@ -430,8 +446,21 @@ function draw() {
   ctx.clearRect(0,0,canvas.width,canvas.height);
   ctx.fillStyle='#0a0f1a'; ctx.fillRect(0,0,canvas.width,canvas.height);
   drawGrid();
+  drawTerrains();
   // 헬기장
   alliances.forEach(al => drawRect(al.helipad.x,al.helipad.y,al.helipad.r,al.color,'🚁',al.name));
+  // 관계설정 기준 연맹 선택 표시
+  if(relSrcIdx!==null&&alliances[relSrcIdx]){
+    const h=alliances[relSrcIdx].helipad, {cx,cy}=toC(h.x,h.y);
+    ctx.strokeStyle='#ffd54f'; ctx.lineWidth=3; ctx.setLineDash([5,3]);
+    ctx.beginPath(); ctx.arc(cx,cy,h.r*ppc+ppc*4,0,Math.PI*2); ctx.stroke();
+    ctx.setLineDash([]);
+    if(ppc>=2){
+      ctx.fillStyle='#ffd54f'; ctx.font=`bold ${ppc*2}px sans-serif`;
+      ctx.textAlign='center'; ctx.textBaseline='bottom';
+      ctx.fillText('기준: '+alliances[relSrcIdx].name, cx, cy-h.r*ppc-ppc*5);
+    }
+  }
   // 도시 (점령 연맹 색상 + 연결 여부 표시)
   cities.forEach((c,ci) => {
     const connAlliances = alliances.filter(al => {
@@ -445,7 +474,9 @@ function draw() {
   });
   // 타워
   alliances.forEach(al => drawBlocks(al.towers, al.color));
+  drawCollisionMarkers();
   if (ghost) drawGhost();
+  saveLS();
 }
 
 function drawGrid() {
@@ -571,12 +602,233 @@ function drawGhost(){
   ctx.setLineDash([]);
 }
 
+// ── 충돌 마커 ────────────────────────────────────────────
+function drawCollisionMarkers(){
+  lastCollisions.forEach(c=>{
+    const {cx,cy}=toC(c.x,c.y), s=ppc*5;
+    ctx.strokeStyle='#ff9800'; ctx.lineWidth=2.5;
+    ctx.beginPath();
+    ctx.moveTo(cx-s,cy-s);ctx.lineTo(cx+s,cy+s);
+    ctx.moveTo(cx+s,cy-s);ctx.lineTo(cx-s,cy+s);
+    ctx.stroke();
+    ctx.fillStyle='#ff9800cc';
+    ctx.beginPath();ctx.arc(cx,cy,ppc*2,0,Math.PI*2);ctx.fill();
+    if(ppc>=2){
+      ctx.fillStyle='#ff9800';
+      ctx.font=`bold ${Math.max(8,ppc*2.2)}px sans-serif`;
+      ctx.textAlign='center';ctx.textBaseline='bottom';
+      ctx.fillText(`⚔ ${fmtT(c.time)}`,cx,cy-ppc*6);
+    }
+  });
+}
+
+// ── 충돌 계산 ────────────────────────────────────────────
+function findCollisions(results){
+  const cols=[];
+  for(let i=0;i<results.length;i++){
+    for(let j=i+1;j<results.length;j++){
+      if(getRel(i,j)!=='enemy') continue;
+      const towA=results[i].res.towers, towB=results[j].res.towers;
+      if(!towA.length||!towB.length) continue;
+      let earliest=null;
+      for(const ta of towA){
+        for(const tb of towB){
+          if(Math.max(0,Math.abs(tb.x-ta.x)-TS)<=GAP&&Math.max(0,Math.abs(tb.y-ta.y)-TS)<=GAP){
+            const t=Math.max(ta.total,tb.total);
+            if(!earliest||t<earliest.time)
+              earliest={time:t,x:Math.round((ta.x+tb.x)/2),y:Math.round((ta.y+tb.y)/2),
+                alA:results[i].al,alB:results[j].al,towerA:ta.num,towerB:tb.num};
+          }
+        }
+      }
+      if(earliest) cols.push(earliest);
+    }
+  }
+  return cols.sort((a,b)=>a.time-b.time);
+}
+
+// ── 결과 내보내기 ─────────────────────────────────────────
+function exportResults(){
+  if(!lastSimResults.length){alert('먼저 계산을 실행하세요.');return;}
+  let txt=`=== SLG 전장 시뮬레이터 결과 ===\n`;
+  txt+=`계산: ${new Date().toLocaleString('ko-KR')} | 목표: (${G('tgtX')},${G('tgtY')})\n\n`;
+  if(lastCollisions.length){
+    txt+=`--- 충돌 예상 ---\n`;
+    lastCollisions.forEach(c=>{txt+=`${c.alA.name} vs ${c.alB.name}: ${fmtT(c.time)} 후 (${c.x},${c.y})\n`;});
+    txt+='\n';
+  }
+  txt+=`--- 연맹별 결과 ---\n`;
+  [...lastSimResults].sort((a,b)=>a.res.total-b.res.total).forEach(({al,res},rank)=>{
+    txt+=`[${rank+1}위] ${al.name}: ${fmtT(res.total)}\n`;
+    const sh=res.towers.find(t=>t.wait>0);
+    if(sh) txt+=`  ⚠ 탑 #${sh.num}부터 시멘트 부족\n`;
+    res.towers.forEach(t=>{
+      txt+=`  탑#${t.num}(${t.x},${t.y}) 비용:${fmtK(t.cost)} 생산:${t.prod}/분 대기:${t.wait>0?Math.round(t.wait)+'분':'즉시'} 누적:${fmtT(t.total)}\n`;
+    });
+    txt+='\n';
+  });
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([txt],{type:'text/plain;charset=utf-8'}));
+  a.download=`war_sim_${new Date().toISOString().slice(0,10)}.txt`;
+  a.click();
+}
+
+// ── LocalStorage ──────────────────────────────────────────
+function saveLS(){
+  clearTimeout(_lsTimer);
+  _lsTimer=setTimeout(()=>{
+    try{
+      localStorage.setItem('war_map_v1',JSON.stringify({
+        mapW:MAP_W,mapH:MAP_H,
+        buildMin:document.getElementById('tBuildMin').value,
+        burnMin:document.getElementById('tBurnMin').value,
+        towerHp:document.getElementById('tTowerHp').value,
+        burnRate:document.getElementById('tBurnRate').value,
+        tgtX:document.getElementById('tgtX').value,
+        tgtY:document.getElementById('tgtY').value,
+        alliances,cities,terrains,relations
+      }));
+    }catch(e){}
+  },800);
+}
+
+function loadLS(){
+  try{
+    const raw=localStorage.getItem('war_map_v1');
+    if(!raw) return;
+    const d=JSON.parse(raw);
+    MAP_W=d.mapW||404; MAP_H=d.mapH||398;
+    document.getElementById('tMapW').value=MAP_W;
+    document.getElementById('tMapH').value=MAP_H;
+    if(d.buildMin) document.getElementById('tBuildMin').value=d.buildMin;
+    if(d.burnMin)  document.getElementById('tBurnMin').value=d.burnMin;
+    if(d.towerHp)  document.getElementById('tTowerHp').value=d.towerHp;
+    if(d.burnRate) document.getElementById('tBurnRate').value=d.burnRate;
+    if(d.tgtX) document.getElementById('tgtX').value=d.tgtX;
+    if(d.tgtY) document.getElementById('tgtY').value=d.tgtY;
+    if(d.alliances){alliances=d.alliances;activeIdx=0;}
+    if(d.cities)   cities=d.cities;
+    if(d.terrains) terrains=d.terrains;
+    if(d.relations) relations=d.relations;
+  }catch(e){}
+}
+
+// ── 지형 ────────────────────────────────────────────────
+function setTerrainMode(mode){
+  terrainMode=mode; drawingTerrain=null;
+  const defs={river:{id:'tmRiver',bg:'#1565c0',bd:'#42a5f5'},
+               bridge:{id:'tmBridge',bg:'#4e342e',bd:'#8d6e63'},
+               mountain:{id:'tmMountain',bg:'#37474f',bd:'#90a4ae'}};
+  Object.entries(defs).forEach(([k,s])=>{
+    const btn=document.getElementById(s.id); if(!btn) return;
+    btn.style.background =k===mode?s.bg:'#1a2a3a';
+    btn.style.color      =k===mode?'#fff':s.bd;
+    btn.style.borderColor=k===mode?s.bd:'#334';
+  });
+  const off=document.getElementById('tmTerrainOff');
+  if(off){off.style.background=mode===null?'#455a64':'#37474f';}
+}
+
+function undoTerrain(){
+  if(drawingTerrain){drawingTerrain=null;}
+  else{terrains.pop();}
+  draw();
+}
+
+function drawTerrains(){
+  terrains.forEach(t=>{
+    if(t.type==='river')    drawRiverSeg(t.x1,t.y1,t.x2,t.y2,t.w||4);
+    else if(t.type==='bridge')   drawBridgeMark(t.x,t.y);
+    else if(t.type==='mountain') drawMountainArea(t.x,t.y,t.w,t.h);
+  });
+  if(drawingTerrain){
+    ctx.globalAlpha=0.55;
+    const d=drawingTerrain;
+    if(d.type==='river') drawRiverSeg(d.x1,d.y1,d.x2,d.y2,4);
+    else if(d.type==='mountain'){
+      drawMountainArea(Math.min(d.x1,d.x2),Math.min(d.y1,d.y2),
+        Math.abs(d.x2-d.x1),Math.abs(d.y2-d.y1));
+    }
+    ctx.globalAlpha=1;
+  }
+}
+
+function drawRiverSeg(x1,y1,x2,y2,w){
+  const {cx:cx1,cy:cy1}=toC(x1,y1),{cx:cx2,cy:cy2}=toC(x2,y2);
+  ctx.lineCap='round';
+  ctx.strokeStyle='#1a237e'; ctx.lineWidth=(w+2)*ppc;
+  ctx.beginPath();ctx.moveTo(cx1,cy1);ctx.lineTo(cx2,cy2);ctx.stroke();
+  ctx.strokeStyle='#1565c0'; ctx.lineWidth=w*ppc;
+  ctx.beginPath();ctx.moveTo(cx1,cy1);ctx.lineTo(cx2,cy2);ctx.stroke();
+  ctx.strokeStyle='#42a5f566'; ctx.lineWidth=(w-1)*ppc;
+  ctx.beginPath();ctx.moveTo(cx1,cy1);ctx.lineTo(cx2,cy2);ctx.stroke();
+  ctx.lineCap='butt';
+}
+
+function drawBridgeMark(x,y){
+  const {cx,cy}=toC(x,y), bw=ppc*8,bh=ppc*3.5;
+  ctx.fillStyle='#5d4037cc'; ctx.fillRect(cx-bw/2,cy-bh/2,bw,bh);
+  ctx.strokeStyle='#8d6e63'; ctx.lineWidth=1.5; ctx.strokeRect(cx-bw/2,cy-bh/2,bw,bh);
+  ctx.strokeStyle='#a1887f66'; ctx.lineWidth=0.8;
+  for(let i=1;i<5;i++){
+    const lx=cx-bw/2+bw*i/5;
+    ctx.beginPath();ctx.moveTo(lx,cy-bh/2);ctx.lineTo(lx,cy+bh/2);ctx.stroke();
+  }
+  if(ppc>=2){
+    ctx.font=`${Math.max(8,ppc*3)}px sans-serif`;
+    ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText('🌉',cx,cy);
+  }
+}
+
+function drawMountainArea(x,y,w,h){
+  if(w<1||h<1) return;
+  const {cx:ax,cy:ay}=toC(x,y),{cx:bx,cy:by}=toC(x+w,y+h);
+  const mx=Math.min(ax,bx),my=Math.min(ay,by),mw=Math.abs(bx-ax),mh=Math.abs(by-ay);
+  ctx.fillStyle='#4e342e55'; ctx.fillRect(mx,my,mw,mh);
+  ctx.strokeStyle='#795548'; ctx.lineWidth=1.5; ctx.strokeRect(mx,my,mw,mh);
+  if(mw>ppc*6&&mh>ppc*6){
+    const cols=Math.max(1,Math.floor(mw/(ppc*18))),rows=Math.max(1,Math.floor(mh/(ppc*18)));
+    for(let r=0;r<rows;r++) for(let c=0;c<cols;c++){
+      const tx=mx+mw*(c+.5)/cols, ty=my+mh*(r+.5)/rows;
+      const ts=Math.min(mw/cols,mh/rows)*.38;
+      ctx.fillStyle='#5d4037bb';
+      ctx.beginPath();ctx.moveTo(tx,ty-ts);ctx.lineTo(tx+ts,ty+ts);ctx.lineTo(tx-ts,ty+ts);ctx.closePath();ctx.fill();
+      ctx.fillStyle='#efebe9aa';
+      const sw=ts*.35,sh=ts*.45;
+      ctx.beginPath();ctx.moveTo(tx,ty-ts);ctx.lineTo(tx+sw,ty-ts+sh);ctx.lineTo(tx-sw,ty-ts+sh);ctx.closePath();ctx.fill();
+    }
+    if(ppc>=3){
+      ctx.font=`${Math.min(mw,mh)*.35}px sans-serif`;
+      ctx.textAlign='center';ctx.textBaseline='middle';
+      ctx.fillText('⛰',mx+mw/2,my+mh/2);
+    }
+  }
+}
+
 // ── 이벤트 ────────────────────────────────────────────
 function getRaw(e){const r=canvas.getBoundingClientRect();return fromC(e.clientX-r.left,e.clientY-r.top);}
 function getSnapped(e){const raw=getRaw(e);return snapPos(raw.x,raw.y);}
 
 canvas.addEventListener('mousedown',e=>{
   if(e.button!==0) return;
+  if(relSrcIdx!==null){
+    const raw=getRaw(e), hit=hitTest(raw.x,raw.y);
+    if(hit&&hit.type==='helipad'){
+      if(hit.idx!==relSrcIdx){ toggleRel(relSrcIdx,hit.idx); }
+      else { relSrcIdx=null; draw(); }
+      return;
+    }
+  }
+  if(terrainMode){
+    const raw=getRaw(e);
+    if(terrainMode==='bridge'){
+      terrains.push({id:terrainIdSeq++,type:'bridge',x:Math.round(raw.x),y:Math.round(raw.y)});
+      draw(); return;
+    }
+    drawingTerrain={type:terrainMode,x1:raw.x,y1:raw.y,x2:raw.x,y2:raw.y};
+    return;
+  }
   const raw=getRaw(e), hit=hitTest(raw.x,raw.y);
   if(hit){
     const obj=hit.type==='helipad'?alliances[hit.idx].helipad:cities[hit.idx];
@@ -587,6 +839,10 @@ canvas.addEventListener('mousedown',e=>{
 
 canvas.addEventListener('mousemove',e=>{
   const raw=getRaw(e);
+  if(terrainMode&&drawingTerrain){
+    drawingTerrain.x2=raw.x; drawingTerrain.y2=raw.y;
+    draw(); return;
+  }
   if(drag.type){
     isDragging=true;
     const obj=drag.type==='helipad'?alliances[drag.idx].helipad:cities[drag.idx];
@@ -595,8 +851,8 @@ canvas.addEventListener('mousemove',e=>{
     renderCfgTab(); renderCityList(); ghost=null;
   } else {
     const hit=hitTest(raw.x,raw.y);
-    canvas.style.cursor=hit?'grab':'crosshair';
-    ghost=getSnapped(e);
+    canvas.style.cursor=terrainMode?'crosshair':hit?'grab':'crosshair';
+    ghost=terrainMode?null:getSnapped(e);
   }
   const g=ghost||getSnapped(e);
   document.getElementById('posBar').textContent=`좌표: (${g.x}, ${g.y})`;
@@ -605,6 +861,18 @@ canvas.addEventListener('mousemove',e=>{
 
 canvas.addEventListener('mouseup',e=>{
   if(e.button!==0) return;
+  if(terrainMode&&drawingTerrain){
+    const raw=getRaw(e);
+    const dx=Math.abs(raw.x-drawingTerrain.x1),dy=Math.abs(raw.y-drawingTerrain.y1);
+    if(dx>2||dy>2){
+      if(terrainMode==='river')
+        terrains.push({id:terrainIdSeq++,type:'river',x1:drawingTerrain.x1,y1:drawingTerrain.y1,x2:raw.x,y2:raw.y,w:4});
+      else if(terrainMode==='mountain')
+        terrains.push({id:terrainIdSeq++,type:'mountain',
+          x:Math.min(drawingTerrain.x1,raw.x),y:Math.min(drawingTerrain.y1,raw.y),w:dx,h:dy});
+    }
+    drawingTerrain=null; draw(); return;
+  }
   const wasDrag=isDragging; drag={}; isDragging=false; canvas.style.cursor='crosshair';
   if(!wasDrag){
     const raw=getRaw(e);
@@ -639,8 +907,15 @@ canvas.addEventListener('mouseup',e=>{
   draw();
 });
 
-canvas.addEventListener('mouseleave',()=>{drag={};isDragging=false;ghost=null;canvas.style.cursor='crosshair';draw();});
-canvas.addEventListener('contextmenu',e=>e.preventDefault());
+canvas.addEventListener('mouseleave',()=>{drag={};isDragging=false;ghost=null;drawingTerrain=null;canvas.style.cursor='crosshair';draw();});
+canvas.addEventListener('contextmenu',e=>{
+  e.preventDefault();
+  const raw=getRaw(e), hit=hitTest(raw.x,raw.y);
+  if(hit&&hit.type==='helipad'){
+    relSrcIdx=relSrcIdx===hit.idx?null:hit.idx;
+    draw();
+  }
+});
 
 mapWrap.addEventListener('wheel',e=>{
   e.preventDefault();
@@ -681,7 +956,6 @@ function renderAllianceBtns(){
       style="background:${al.color}33;border-color:${al.color};color:${i===activeIdx?'#fff':al.color}"
       onclick="setActive(${i})">
       ${al.name}
-      <span class="al-rm" onclick="event.stopPropagation();removeAlliance(${i})">✕</span>
     </button>`).join('');
 }
 
@@ -757,7 +1031,7 @@ function applyTemplate(){
 }
 
 function saveTemplate(){
-  const data={mapW:MAP_W,mapH:MAP_H,tower:{buildMin:G('tBuildMin'),burnMin:G('tBurnMin'),baseCost:G('tBaseCost'),costInc:G('tCostInc')},alliances,cities};
+  const data={mapW:MAP_W,mapH:MAP_H,tower:{buildMin:G('tBuildMin'),burnMin:G('tBurnMin'),baseCost:G('tBaseCost'),costInc:G('tCostInc')},alliances,cities,terrains};
   const a=document.createElement('a');
   a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));
   a.download='war_map_template.json'; a.click();
@@ -775,6 +1049,7 @@ function loadTemplate(e){
       if(d.tower){document.getElementById('tBuildMin').value=d.tower.buildMin;document.getElementById('tBurnMin').value=d.tower.burnMin;document.getElementById('tBaseCost').value=d.tower.baseCost;document.getElementById('tCostInc').value=d.tower.costInc;}
       if(d.alliances){alliances=d.alliances;activeIdx=0;}
       if(d.cities) cities=d.cities;
+      if(d.terrains) terrains=d.terrains;
       renderAllianceBtns(); renderCfgTab(); renderCityList(); resizeCanvas(); draw();
     }catch{alert('파일 로드 실패');}
   };
@@ -825,18 +1100,38 @@ function runSim(){
       :calcPath(al.helipad.x,al.helipad.y,tx,ty,al.cement,bm,al.towerCount);
     return {al,res};
   });
+  lastSimResults=results;
+  lastCollisions=findCollisions(results);
+
   const sorted=[...results].sort((a,b)=>a.res.total-b.res.total);
   const fastest=sorted[0];
 
-  let html='';
+  let html=`<button class="btn btn-save" style="width:100%;margin-bottom:8px;padding:5px" onclick="exportResults()">📋 결과 내보내기</button>`;
+
+  if(lastCollisions.length){
+    html+=`<div class="sec" style="color:#ff9800;border-bottom-color:#3a2000">⚔️ 충돌 예상</div>`;
+    lastCollisions.forEach(c=>{
+      html+=`<div class="card" style="border-left:3px solid #ff9800;margin-bottom:5px">
+        <div style="font-size:.73rem;font-weight:700;color:#ff9800;margin-bottom:3px">${c.alA.name} vs ${c.alB.name}</div>
+        <div class="card-row"><span>예상 충돌</span><span style="color:#ffb74d;font-weight:700">${fmtT(c.time)} 후</span></div>
+        <div class="card-row"><span>좌표</span><span style="color:#fff">(${c.x}, ${c.y})</span></div>
+        <div class="card-row" style="font-size:.63rem;color:#666"><span>탑 번호</span><span>${c.alA.name} #${c.towerA} ↔ ${c.alB.name} #${c.towerB}</span></div>
+      </div>`;
+    });
+  }
+
   results.forEach(({al,res})=>{
-    const isFastest=res.total===fastest.res.total;
-    const diff=Math.abs(res.total-fastest.res.total);
+    const rank=sorted.findIndex(s=>s.al===al);
+    const diff=res.total-fastest.res.total;
+    const shortage=res.towers.find(t=>t.wait>0);
     html+=`<div class="card" style="border-left:3px solid ${al.color}">
       <div style="font-size:.78rem;font-weight:700;color:${al.color};margin-bottom:4px">${al.name}</div>
       <div class="card-row"><span>도달 시간</span><span style="color:${al.color};font-weight:700">${fmtT(res.total)}</span></div>
-      ${!isFastest?`<div class="card-row"><span>차이</span><span style="color:#ff9800">+${fmtT(diff)}</span></div>`:''}
-      <span class="badge ${isFastest?'win':'lose'}">${isFastest?'🥇 가장 빠름':`${sorted.indexOf({al,res})+1}위`}</span>
+      ${diff>0?`<div class="card-row"><span>차이</span><span style="color:#ff9800">+${fmtT(diff)}</span></div>`:''}
+      ${shortage
+        ?`<div class="card-row"><span style="color:#ffb74d">⚠ 시멘트 부족</span><span style="color:#ffb74d">탑 #${shortage.num}부터</span></div>`
+        :`<div class="card-row"><span style="color:#81c784">✅ 시멘트 충분</span></div>`}
+      <span class="badge ${rank===0?'win':'lose'}">${rank===0?'🥇 가장 빠름':`${rank+1}위`}</span>
     </div>
     <details style="margin-bottom:8px;font-size:.68rem">
       <summary style="color:#666;cursor:pointer;padding:2px 4px">타워 상세 ▾</summary>
@@ -845,7 +1140,8 @@ function runSim(){
   });
 
   document.getElementById('resultCards').innerHTML=html;
-  showTab('res',document.querySelectorAll('.tab')[2]);
+  showTab('res',document.querySelectorAll('.tab')[6]);
+  draw();
 }
 
 function renderTableStr(towers){
@@ -874,50 +1170,94 @@ function findNearestTower(towers, x, y) {
 }
 
 // ── 동맹 관계 탭 ──────────────────────────────────────
+let relSrcIdx = null;
+
 function renderRelTab(){
-  const REL = {ally:{icon:'🟢',label:'동맹',color:'#2e7d32'},
-               neutral:{icon:'⚪',label:'중립',color:'#555'},
-               enemy:{icon:'🔴',label:'적대',color:'#7f0000'}};
-  let html='';
-  for(let i=0;i<alliances.length;i++){
-    for(let j=i+1;j<alliances.length;j++){
-      const r=getRel(i,j), ri=REL[r];
-      html+=`<div style="display:flex;align-items:center;gap:5px;margin-bottom:5px;background:#0d1825;border-radius:4px;padding:5px 7px">
-        <span style="font-size:.7rem;color:${alliances[i].color};min-width:45px">${alliances[i].name}</span>
-        <span style="font-size:.65rem;color:#444">vs</span>
-        <span style="font-size:.7rem;color:${alliances[j].color};min-width:45px">${alliances[j].name}</span>
-        <div style="display:flex;gap:3px;margin-left:auto">
-          ${Object.entries(REL).map(([k,v])=>`
-            <button onclick="setRel(${i},${j},'${k}')"
-              style="padding:2px 5px;border:1px solid ${r===k?v.color:'#333'};border-radius:3px;
-                     background:${r===k?v.color+'33':'#0d1020'};color:${r===k?'#fff':'#666'};
-                     font-size:.65rem;cursor:pointer">${v.icon}</button>`).join('')}
-        </div>
-      </div>`;
-    }
-  }
-  document.getElementById('relMatrix').innerHTML=html||'<p style="color:#444;font-size:.72rem">연맹을 2개 이상 추가하세요.</p>';
+  const REL={ally:{icon:'🟢',color:'#2e7d32'},neutral:{icon:'⚪',color:'#444'},enemy:{icon:'🔴',color:'#7f0000'}};
+
+  // 매트릭스 테이블
+  let mat=`<div style="overflow-x:auto;margin-bottom:8px">
+  <table style="border-collapse:collapse;width:100%">
+    <thead><tr>
+      <th style="background:#080e18;min-width:24px"></th>
+      ${alliances.map((al,i)=>`<th title="${al.name}"
+        style="background:${al.color}22;padding:1px 2px;color:${al.color};text-align:center;font-size:.55rem;white-space:nowrap;overflow:hidden;max-width:26px">
+        ${al.name.slice(0,2)}</th>`).join('')}
+    </tr></thead><tbody>
+    ${alliances.map((al,i)=>`<tr>
+      <td title="${al.name}" style="background:${al.color}22;color:${al.color};padding:1px 3px;font-size:.57rem;white-space:nowrap">${al.name.slice(0,3)}</td>
+      ${alliances.map((al2,j)=>{
+        if(i===j) return `<td style="background:#0a0f1a;text-align:center;color:#222;font-size:.6rem">━</td>`;
+        const r=getRel(i,j);
+        return `<td onclick="toggleRel(${i},${j})" title="${al.name} vs ${al2.name} (클릭: 토글)"
+          style="text-align:center;cursor:pointer;background:${REL[r].color}22;
+                 border:1px solid ${REL[r].color}44;padding:0;font-size:.78rem;line-height:1.5">${REL[r].icon}</td>`;
+      }).join('')}
+    </tr>`).join('')}
+    </tbody>
+  </table></div>`;
+
+  // 일괄 설정
+  let bulk=`<div class="sec">⚡ 일괄 설정</div>
+  <div style="display:flex;flex-wrap:wrap;gap:3px;margin-bottom:5px">
+    ${alliances.map((al,i)=>`
+      <label style="display:flex;align-items:center;gap:2px;cursor:pointer;
+        background:${al.color}22;border:1px solid ${al.color}55;border-radius:3px;padding:2px 5px">
+        <input type="checkbox" id="bulkCb${i}" style="accent-color:${al.color};width:10px;height:10px">
+        <span style="font-size:.62rem;color:${al.color}">${al.name}</span>
+      </label>`).join('')}
+  </div>
+  <div style="display:flex;gap:3px;margin-bottom:6px">
+    <button class="btn" onclick="bulkApply('ally')"
+      style="flex:1;padding:3px;font-size:.62rem;background:#1b3a1b;color:#81c784;border:1px solid #2e7d32">🟢 동맹</button>
+    <button class="btn" onclick="bulkApply('enemy')"
+      style="flex:1;padding:3px;font-size:.62rem;background:#3a1010;color:#ef9a9a;border:1px solid #7f0000">🔴 적대</button>
+    <button class="btn" onclick="bulkApply('neutral')"
+      style="flex:1;padding:3px;font-size:.62rem;background:#1a1a2e;color:#aaa;border:1px solid #334">⚪ 중립</button>
+    <button class="btn" onclick="resetAllRel()"
+      style="padding:3px 8px;font-size:.62rem;background:#37474f;color:#ccc;border:1px solid #455a64" title="전체 중립 초기화">🗑</button>
+  </div>
+  <div style="font-size:.6rem;color:#444">💡 맵에서 헬기장 우클릭 → 기준 연맹 선택 후 다른 헬기장 좌클릭으로 관계 토글</div>`;
+
+  document.getElementById('relMatrix').innerHTML=mat+bulk;
 
   // 진영 합산 점수
-  const teamScores = alliances.map((_,i)=>{
-    const allies = alliances.filter((_,j)=>j!==i&&getRel(i,j)==='ally');
-    const total = [i,...allies.map((_,k)=>alliances.indexOf(allies[k]))]
-      .reduce((s,idx)=>s+calcScore(idx).total,0);
-    return {idx:i, allies, total};
-  });
-  const sorted=[...teamScores].sort((a,b)=>b.total-a.total);
-  document.getElementById('relTeamScore').innerHTML=sorted.map((t,rank)=>{
+  const scores=alliances.map((_,i)=>{
+    const alliedIdx=alliances.map((_,j)=>j).filter(j=>j!==i&&getRel(i,j)==='ally');
+    const total=[i,...alliedIdx].reduce((s,idx)=>s+calcScore(idx).total,0);
+    return {i,alliedIdx,total};
+  }).sort((a,b)=>b.total-a.total);
+  document.getElementById('relTeamScore').innerHTML=scores.map((t,rank)=>{
     const medals=['🥇','🥈','🥉'];
-    const al=alliances[t.idx];
-    const allyNames=t.allies.map(a=>a.name).join(', ')||'없음';
+    const al=alliances[t.i];
+    const allyNames=t.alliedIdx.map(j=>alliances[j]?.name).filter(Boolean).join(', ')||'없음';
     return `<div style="background:#0d1825;border-left:3px solid ${al.color};border-radius:4px;padding:6px 8px;margin-bottom:5px">
       <div style="display:flex;justify-content:space-between">
-        <span style="font-size:.75rem;font-weight:700;color:${al.color}">${medals[rank]||rank+1+'위'} ${al.name}</span>
+        <span style="font-size:.75rem;font-weight:700;color:${al.color}">${medals[rank]||`${rank+1}위`} ${al.name}</span>
         <span style="font-size:.78rem;color:#fff;font-weight:700">${(t.total/10000).toFixed(0)}만점</span>
       </div>
       <div style="font-size:.63rem;color:#555;margin-top:2px">동맹: ${allyNames}</div>
     </div>`;
   }).join('');
+}
+
+function toggleRel(i,j){
+  const cur=getRel(i,j);
+  setRel(i,j,cur==='neutral'?'ally':cur==='ally'?'enemy':'neutral');
+}
+
+function bulkApply(rel){
+  const sel=alliances.map((_,i)=>document.getElementById('bulkCb'+i)?.checked?i:-1).filter(i=>i>=0);
+  if(sel.length<2){alert('2개 이상 선택하세요.');return;}
+  for(let a=0;a<sel.length;a++)
+    for(let b=a+1;b<sel.length;b++)
+      relations[relKey(sel[a],sel[b])]=rel;
+  renderRelTab(); draw();
+}
+
+function resetAllRel(){
+  if(!confirm('모든 관계를 중립으로 초기화할까요?')) return;
+  relations={}; renderRelTab(); draw();
 }
 
 // ── 이벤트 탭 ────────────────────────────────────────
@@ -1013,7 +1353,7 @@ function resetCoinChase(idx){ alliances[idx].coinChaseUsed=0; alliances[idx].coi
 
 // ── 전소 계산 탭 ─────────────────────────────────────
 function addBurnTower(){
-  burnTowers.push({id:burnIdSeq++,label:`타워 ${burnIdSeq}`,hp:100000,maxHp:100000,dmgPerMin:5000,repairPerMin:0});
+  burnTowers.push({id:burnIdSeq++,label:`타워 ${burnIdSeq}`,hp:7200,maxHp:7200,dmgPerSec:5,repairPerSec:0});
   renderBurnTab();
 }
 function removeBurnTower(id){ burnTowers=burnTowers.filter(t=>t.id!==id); renderBurnTab(); }
@@ -1031,10 +1371,10 @@ function renderBurnTab(){
           <input type="number" value="${t.hp}" oninput="burnTowers[${i}].hp=+this.value;renderBurnTab()"></div>
         <div class="row" style="flex:1;min-width:80px"><label>최대 HP</label>
           <input type="number" value="${t.maxHp}" oninput="burnTowers[${i}].maxHp=+this.value;renderBurnTab()"></div>
-        <div class="row" style="flex:1;min-width:80px"><label>분당 피해</label>
-          <input type="number" value="${t.dmgPerMin}" oninput="burnTowers[${i}].dmgPerMin=+this.value;renderBurnTab()"></div>
-        <div class="row" style="flex:1;min-width:80px"><label>분당 수리</label>
-          <input type="number" value="${t.repairPerMin}" oninput="burnTowers[${i}].repairPerMin=+this.value;renderBurnTab()"></div>
+        <div class="row" style="flex:1;min-width:80px"><label>초당 피해</label>
+          <input type="number" value="${t.dmgPerSec}" oninput="burnTowers[${i}].dmgPerSec=+this.value;renderBurnTab()"></div>
+        <div class="row" style="flex:1;min-width:80px"><label>초당 수리</label>
+          <input type="number" value="${t.repairPerSec}" oninput="burnTowers[${i}].repairPerSec=+this.value;renderBurnTab()"></div>
       </div>
     </div>`).join('');
 
@@ -1043,18 +1383,19 @@ function renderBurnTab(){
     ? '<p style="color:#444;font-size:.72rem">타워를 추가하세요.</p>'
     : '<div class="sec">계산 결과</div>'
       + burnTowers.map(t=>{
-          const net=t.dmgPerMin-t.repairPerMin;
+          const net=t.dmgPerSec-t.repairPerSec;
           if(net<=0) return `<div style="background:#0d1825;border-radius:4px;padding:7px;margin-bottom:5px">
             <span style="color:#81c784;font-size:.75rem">🛡 ${t.label}: 수리 중 (파괴 없음)</span></div>`;
-          const minLeft=t.hp/net;
-          const destroyAt=new Date(now.getTime()+minLeft*60000);
+          const secLeft=t.hp/net;
+          const minLeft=secLeft/60;
+          const destroyAt=new Date(now.getTime()+secLeft*1000);
           const hLeft=Math.floor(minLeft/60), mLeft=Math.round(minLeft%60);
           return `<div style="background:#1a0d0d;border-left:3px solid #ef5350;border-radius:4px;padding:7px;margin-bottom:5px">
             <div style="font-size:.75rem;font-weight:700;color:#ef9a9a">${t.label}</div>
             <div style="font-size:.72rem;margin-top:3px">
               <span style="color:#ff9800">⏱ ${hLeft}시간 ${mLeft}분 후 전소</span><br>
               <span style="color:#666;font-size:.65rem">UTC ${destroyAt.toUTCString().replace(' GMT','')}</span><br>
-              <span style="color:#888;font-size:.65rem">순 피해: ${net.toLocaleString()}/분 | HP ${((t.hp/t.maxHp)*100).toFixed(1)}%</span>
+              <span style="color:#888;font-size:.65rem">순 피해: ${net.toLocaleString()}/초 | HP ${((t.hp/t.maxHp)*100).toFixed(1)}%</span>
             </div>
           </div>`;
         }).join('');
@@ -1124,6 +1465,7 @@ function renderOcpTab(){
 }
 
 // ── 초기화 ────────────────────────────────────────────
+loadLS();
 renderAllianceBtns();
 renderCfgTab();
 renderCityList();
