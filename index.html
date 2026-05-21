@@ -443,6 +443,10 @@ tr:hover td{background:rgba(34,211,238,.025)}
 
     <!-- 연맹 설정 탭 -->
     <div class="tab-body" id="tabCfg">
+      <button class="btn btn-calc"
+        data-tip="맵의 현재 도시 점령 상황을 사이드바에 반영하고 퀘스트 보너스 지급"
+        style="width:100%;margin-bottom:8px;padding:6px"
+        onclick="applyMapState()">🔄 맵 현황 반영</button>
       <div id="allianceCfgList"></div>
       <button class="btn btn-add" style="width:100%;margin-top:4px;padding:7px" onclick="addAlliance()">+ 연맹 추가</button>
     </div>
@@ -537,6 +541,46 @@ function calcProd(c6, c7, c8) {
     + (c8 >= 1 ? 50 : 0);
 }
 
+// 도시 점령 퀘스트 (최초 1회 시멘트 보너스)
+const CITY_QUESTS = [
+  {key:'6-1', level:6, count:1, bonus:50,  label:'6도시 1개 점령'},
+  {key:'6-2', level:6, count:2, bonus:50,  label:'6도시 2개 점령'},
+  {key:'7-1', level:7, count:1, bonus:100, label:'7도시 1개 점령'},
+  {key:'7-3', level:7, count:3, bonus:150, label:'7도시 3개 점령'},
+  {key:'8-1', level:8, count:1, bonus:150, label:'8도시 1개 점령'},
+];
+
+// 소유 도시 기반 실제 생산량
+function calcProdFromOwned(al) {
+  let c6=0,c7=0,c8=0;
+  cities.forEach(c=>{ if(c.owner===al.id){ if(c.level===6)c6++; else if(c.level===7)c7++; else c8++; } });
+  return calcProd(c6,c7,c8);
+}
+
+// 퀘스트 체크 및 시멘트 지급 (최초 1회)
+function checkAndApplyQuests(al) {
+  if(!al.questClaimed) al.questClaimed={};
+  let c6=0,c7=0,c8=0;
+  cities.forEach(c=>{ if(c.owner===al.id){ if(c.level===6)c6++; else if(c.level===7)c7++; else c8++; } });
+  const cnt={6:c6,7:c7,8:c8};
+  let gained=0;
+  CITY_QUESTS.forEach(q=>{
+    if(!al.questClaimed[q.key] && cnt[q.level]>=q.count){
+      al.questClaimed[q.key]=true;
+      al.cement=+(al.cement+q.bonus).toFixed(1);
+      gained+=q.bonus;
+    }
+  });
+  return gained;
+}
+
+// 전체 연맹 퀘스트 체크 + cfg탭 갱신
+function applyMapState() {
+  alliances.forEach(al=>checkAndApplyQuests(al));
+  renderCfgTab();
+  renderOcpTab();
+}
+
 // 타워 좌표에서 연결된 도시 인덱스 집합 반환
 function checkCityConn(tx, ty, connectedSet) {
   const newlyConnected = [];
@@ -588,7 +632,7 @@ function makeAlliance(id, name, color, hx, hy) {
   return { id, name, color, towers:[],
     helipad:{x:hx, y:hy, r:15},
     cement:100, towerCount:20, cities6:0, cities7:0, cities8:0,
-    prismCoins:0, coinChaseUsed:0, coinChaseLastUTC:null };
+    prismCoins:0, coinChaseUsed:0, coinChaseLastUTC:null, questClaimed:{} };
 }
 let alliances = [
   makeAlliance(0,'A 연맹', AL_COLORS[0],  84, 371),
@@ -1311,7 +1355,7 @@ function showCityOwnerMenu(cityIdx, px, py){
   const candidates=alliances.filter(al=>al.towers.some(t=>isTowerConnToCity(t,c)));
   (candidates.length?candidates:alliances).forEach(al=>{
     const mark=c.owner===al.id?' ✓':'';
-    makeBtn(al.name+mark, al.color, ()=>{ c.owner=al.id; });
+    makeBtn(al.name+mark, al.color, ()=>{ c.owner=al.id; checkAndApplyQuests(al); renderCfgTab(); });
   });
   document.body.appendChild(menu);
   const close=ev=>{ if(!menu.contains(ev.target)){menu.remove();document.removeEventListener('mousedown',close);} };
@@ -1395,14 +1439,29 @@ function renderCfgTab(){
             style="opacity:.6;cursor:not-allowed"></div>
       </div>
       ${(()=>{
+        // 점령 도시
+        const owned=cities.filter(c=>c.owner===al.id);
+        const ownedLabels=owned.map(c=>c.label).join(', ')||'없음';
+        const ownedProd=calcProdFromOwned(al);
+        // 연결 도시 (타워 연결 기반 시뮬레이션)
         const conn=getConnectedCities(al.towers.length>0?al.towers:[{x:al.helipad.x+al.helipad.r/2,y:al.helipad.y-al.helipad.r/2}]);
-        const prod=calcProdFromSet(conn);
-        const cityLabels=[...conn].map(ci=>cities[ci]?.label||'').filter(Boolean).join(', ')||'없음';
+        const connProd=calcProdFromSet(conn);
         const nextCost=getTowerCost(al.towers.length+1);
-        return `<div style="font-size:.7rem;background:#0d1b2e;border-radius:3px;padding:5px 7px;margin-bottom:6px;line-height:1.6">
-          🏙 연결 도시: <span style="color:#ffd54f">${cityLabels}</span><br>
-          📦 분당 생산량: <strong style="color:#90caf9">${prod}/분</strong>
-          &nbsp;│&nbsp; 다음 탑 비용: <strong style="color:#ef9a9a">${nextCost.toLocaleString()}</strong>
+        // 퀘스트 현황
+        if(!al.questClaimed) al.questClaimed={};
+        const questRows=CITY_QUESTS.map(q=>{
+          const done=!!al.questClaimed[q.key];
+          return `<span style="color:${done?'#4ade80':'#475569'};font-size:.62rem">${done?'✓':'○'} ${q.label}(+${q.bonus}k)</span>`;
+        }).join('<br>');
+        return `<div style="font-size:.7rem;background:#0d1b2e;border-radius:3px;padding:5px 7px;margin-bottom:4px;line-height:1.7">
+          🏙 점령 도시: <span style="color:#ffd54f">${ownedLabels}</span><br>
+          📦 실제 생산량: <strong style="color:#4ade80">${ownedProd}/분</strong>
+          &nbsp;│&nbsp; 시뮬 생산량: <span style="color:#90caf9;font-size:.65rem">${connProd}/분</span><br>
+          💰 다음 탑 비용: <strong style="color:#ef9a9a">${nextCost.toLocaleString()}</strong>
+        </div>
+        <div style="font-size:.62rem;background:#07111e;border-radius:3px;padding:4px 7px;margin-bottom:6px;line-height:1.8;border:1px solid #0d2040">
+          <span style="color:#f59e0b;font-size:.58rem;font-family:'Rajdhani',sans-serif;text-transform:uppercase;letter-spacing:1px">퀘스트 보너스</span><br>
+          ${questRows}
         </div>`;
       })()}
     </div>`).join('');
