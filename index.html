@@ -301,6 +301,16 @@ tr:hover td{background:rgba(34,211,238,.025)}
     <button class="btn btn-reset" onclick="resetTowers()"
       data-tip="현재 연맹의 타워 전체 삭제">🗑 초기화</button>
     <span class="sep">│</span>
+    <button class="btn" id="allyModeBtn" onclick="enterAllyMode()"
+      data-tip="헬기장 클릭으로 동맹 선택 → 완료"
+      style="background:rgba(16,185,129,.08);color:#4ade80;border:1px solid rgba(16,185,129,.3)">🤝 동맹 설정</button>
+    <button class="btn" id="allyConfirmBtn" onclick="confirmAllyMode()"
+      data-tip="선택한 연맹들로 동맹 결성 (1개 선택 시 동맹 해제)"
+      style="display:none;background:rgba(16,185,129,.2);color:#4ade80;border:1px solid #16a34a">✓ 완료</button>
+    <button class="btn" id="allyCancelBtn" onclick="exitAllyMode()"
+      data-tip="동맹 설정 취소"
+      style="display:none;background:rgba(239,68,68,.08);color:#f87171;border:1px solid rgba(239,68,68,.3)">✕ 취소</button>
+    <span class="sep">│</span>
     <span style="font-size:.65rem;color:#5a7a9a">스냅:</span>
     <div id="snapBtns" style="display:flex;gap:3px">
       <button class="btn" id="snap1" onclick="setSnap(1)"
@@ -767,6 +777,25 @@ function draw() {
   drawTerrains();
   // 헬기장
   alliances.forEach(al => drawRect(al.helipad.x,al.helipad.y,al.helipad.r,al.color,'🚁',al.name));
+  // 동맹 설정 모드: 선택된 헬기장 하이라이트
+  if(allyMode){
+    allySelected.forEach(idx=>{
+      const al=alliances[idx]; if(!al) return;
+      const h=al.helipad, {cx,cy}=toC(h.x,h.y), spx=h.r*ppc;
+      const ecx=cx+spx/2, ecy=cy+spx/2;
+      ctx.strokeStyle='#4ade80'; ctx.lineWidth=2.5; ctx.setLineDash([4,3]);
+      ctx.beginPath(); ctx.arc(ecx,ecy,spx/2+ppc*3,0,Math.PI*2); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle='#4ade8088';
+      ctx.font=`bold ${ppc*2.2}px sans-serif`; ctx.textAlign='center'; ctx.textBaseline='bottom';
+      ctx.fillText('✓ '+al.name, ecx, cy-ppc*5);
+    });
+    if(ppc>=2){
+      ctx.fillStyle='#4ade8066'; ctx.font=`${ppc*2}px sans-serif`;
+      ctx.textAlign='left'; ctx.textBaseline='top';
+      ctx.fillText(`동맹 설정 중 — ${allySelected.size}개 선택`, 6, 6);
+    }
+  }
   // 관계설정 기준 연맹 선택 표시
   if(relSrcIdx!==null&&alliances[relSrcIdx]){
     const h=alliances[relSrcIdx].helipad;
@@ -1135,6 +1164,15 @@ function getSnapped(e){const raw=getRaw(e);return snapPos(raw.x,raw.y);}
 
 canvas.addEventListener('mousedown',e=>{
   if(e.button!==0) return;
+  if(allyMode){
+    const raw=getRaw(e), hit=hitTest(raw.x,raw.y);
+    if(hit&&hit.type==='helipad'){
+      if(allySelected.has(hit.idx)) allySelected.delete(hit.idx);
+      else allySelected.add(hit.idx);
+      draw();
+    }
+    return;
+  }
   if(relSrcIdx!==null){
     const raw=getRaw(e), hit=hitTest(raw.x,raw.y);
     if(hit&&hit.type==='helipad'){
@@ -1547,6 +1585,42 @@ function findNearestTower(towers, x, y) {
 
 // ── 동맹 관계 탭 ──────────────────────────────────────
 let relSrcIdx = null;
+
+// ── 동맹 설정 모드 ─────────────────────────────────────
+let allyMode = false;
+let allySelected = new Set(); // 선택된 alliance index set
+
+function enterAllyMode(){
+  allyMode=true; allySelected.clear();
+  document.getElementById('allyModeBtn').style.display='none';
+  document.getElementById('allyConfirmBtn').style.display='';
+  document.getElementById('allyCancelBtn').style.display='';
+  canvas.style.cursor='crosshair';
+  draw();
+}
+
+function exitAllyMode(){
+  allyMode=false; allySelected.clear();
+  document.getElementById('allyModeBtn').style.display='';
+  document.getElementById('allyConfirmBtn').style.display='none';
+  document.getElementById('allyCancelBtn').style.display='none';
+  draw();
+}
+
+function confirmAllyMode(){
+  const sel=[...allySelected];
+  if(sel.length===1){
+    // 단독 선택 → 해당 연맹의 모든 동맹 관계를 중립으로
+    const i=sel[0];
+    alliances.forEach((_,j)=>{ if(i!==j&&getRel(i,j)==='ally') setRel(i,j,'neutral'); });
+  } else if(sel.length>=2){
+    // 복수 선택 → 선택된 연맹끼리 모두 동맹
+    for(let a=0;a<sel.length;a++)
+      for(let b=a+1;b<sel.length;b++)
+        setRel(sel[a],sel[b],'ally');
+  }
+  exitAllyMode();
+}
 
 function renderRelTab(){
   const REL={ally:{icon:'🟢',color:'#2e7d32'},neutral:{icon:'⚪',color:'#444'},enemy:{icon:'🔴',color:'#7f0000'}};
