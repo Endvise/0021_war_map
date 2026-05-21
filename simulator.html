@@ -3,74 +3,249 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SLG 전장 타워 시뮬레이터</title>
+<title>⚔ WAR MAP — SLG 전장 시뮬레이터</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&family=Share+Tech+Mono&display=swap" rel="stylesheet">
 <style>
+:root{
+  --bg0:#02040b;--bg1:#050810;--bg2:#070c18;--bg3:#0a1020;
+  --border:#0d1c38;--border2:#162444;
+  --amber:#f59e0b;--amber-d:#78490a;
+  --cyan:#22d3ee;--cyan-d:#0e4a5a;
+  --green:#10b981;--red:#ef4444;
+  --txt:#94a3b8;--txt2:#cbd5e1;--txt3:#e2e8f0;
+}
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:'Segoe UI',sans-serif;background:#12121f;color:#ddd;display:flex;flex-direction:column;height:100vh;overflow:hidden}
-header{padding:6px 10px;background:#1a1a2e;border-bottom:1px solid #2a2a4a;display:flex;align-items:center;gap:8px;flex-shrink:0;flex-wrap:wrap}
-header h1{color:#4fc3f7;font-size:.9rem;white-space:nowrap}
-.sep{color:#333;font-size:.8rem}
-.btn{padding:4px 9px;border:none;border-radius:4px;cursor:pointer;font-size:.73rem;font-weight:600;white-space:nowrap}
-.btn-calc{background:#0288d1;color:#fff}.btn-calc:hover{background:#0277bd}
-.btn-reset{background:#37474f;color:#ccc}.btn-reset:hover{background:#455a64}
-.btn-add{background:#1b3a1b;color:#81c784;border:1px solid #2e7d32;font-size:.7rem}
-.btn-add:hover{background:#2e7d32;color:#fff}
-.btn-save{background:#1a2a4a;color:#90caf9;border:1px solid #1565c0}.btn-save:hover{background:#1565c0;color:#fff}
-.btn-load{background:#2a1a4a;color:#ce93d8;border:1px solid #6a1b9a}.btn-load:hover{background:#6a1b9a;color:#fff}
-.hint{font-size:.65rem;color:#444;margin-left:auto}
 
-/* 연맹 버튼 */
-#allianceBtns{display:flex;gap:4px;flex-wrap:wrap}
-.al-btn{padding:4px 8px;border-radius:4px;border:2px solid transparent;font-size:.73rem;font-weight:700;cursor:pointer;transition:all .12s;opacity:.6}
-.al-btn.active{opacity:1;color:#fff}
-.al-rm{font-size:.65rem;margin-left:3px;opacity:.6;cursor:pointer}.al-rm:hover{opacity:1}
+body{
+  font-family:'Share Tech Mono',monospace;
+  background:var(--bg0);color:var(--txt);
+  display:flex;flex-direction:column;height:100vh;overflow:hidden;
+}
 
+/* scanline texture */
+body::after{
+  content:'';position:fixed;inset:0;pointer-events:none;z-index:9999;
+  background:repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,0,0,.04) 3px,rgba(0,0,0,.04) 4px);
+}
+
+/* ── HEADER ── */
+header{
+  padding:0 10px;
+  background:linear-gradient(180deg,#060c1c 0%,#040810 100%);
+  border-bottom:1px solid var(--border);
+  display:flex;align-items:center;gap:6px;flex-shrink:0;flex-wrap:wrap;
+  min-height:42px;position:relative;
+}
+header::after{
+  content:'';position:absolute;bottom:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent 0%,#22d3ee33 30%,#f59e0b44 50%,#22d3ee33 70%,transparent 100%);
+}
+header h1{
+  font-family:'Rajdhani',sans-serif;
+  color:var(--amber);font-size:.95rem;font-weight:700;
+  letter-spacing:3px;text-transform:uppercase;white-space:nowrap;
+  text-shadow:0 0 24px rgba(245,158,11,.5),0 0 48px rgba(245,158,11,.2);
+}
+
+/* corner decoration */
+header h1::before{content:'▸ ';color:var(--cyan);opacity:.7;}
+
+.sep{color:#1a2e50;font-size:.9rem;user-select:none}
+
+/* ── BUTTONS ── */
+.btn{
+  padding:3px 9px;border:1px solid var(--border2);border-radius:2px;
+  cursor:pointer;font-size:.68rem;font-weight:600;white-space:nowrap;
+  font-family:'Rajdhani',sans-serif;letter-spacing:.8px;text-transform:uppercase;
+  transition:all .15s;background:var(--bg2);color:#475569;
+}
+.btn:hover{border-color:var(--cyan);color:var(--cyan);background:rgba(34,211,238,.05)}
+
+.btn-calc{
+  background:linear-gradient(135deg,rgba(34,211,238,.12),rgba(34,211,238,.06));
+  color:var(--cyan);border-color:var(--cyan-d);
+  box-shadow:0 0 10px rgba(34,211,238,.12),inset 0 0 20px rgba(34,211,238,.04);
+}
+.btn-calc:hover{
+  background:linear-gradient(135deg,rgba(34,211,238,.22),rgba(34,211,238,.12));
+  box-shadow:0 0 20px rgba(34,211,238,.25);border-color:var(--cyan);
+}
+
+.btn-reset{background:var(--bg1);color:#334155;border-color:var(--border)}
+.btn-reset:hover{color:var(--red);border-color:#7f1d1d;background:rgba(239,68,68,.06)}
+
+.btn-add{background:rgba(16,185,129,.08);color:var(--green);border-color:rgba(16,185,129,.25);font-size:.65rem}
+.btn-add:hover{background:rgba(16,185,129,.18);border-color:var(--green);color:#fff}
+
+.btn-save{background:rgba(34,211,238,.06);color:var(--cyan);border-color:var(--cyan-d)}
+.btn-save:hover{background:rgba(34,211,238,.16);border-color:var(--cyan)}
+
+.btn-load{background:rgba(192,132,252,.06);color:#c084fc;border-color:rgba(139,92,246,.25)}
+.btn-load:hover{background:rgba(139,92,246,.2);border-color:#8b5cf6;color:#fff}
+
+.hint{font-size:.58rem;color:#1e2e48;margin-left:auto;font-family:'JetBrains Mono',monospace;}
+
+/* ── ALLIANCE BUTTONS ── */
+#allianceBtns{display:flex;gap:3px;flex-wrap:wrap}
+.al-btn{
+  padding:3px 8px;border-radius:2px;border:1px solid transparent;
+  font-size:.68rem;font-weight:700;cursor:pointer;transition:all .15s;opacity:.45;
+  font-family:'Rajdhani',sans-serif;letter-spacing:.8px;text-transform:uppercase;
+}
+.al-btn:hover{opacity:.75}
+.al-btn.active{opacity:1;color:#fff;box-shadow:0 0 10px currentColor,0 0 20px rgba(0,0,0,.5);}
+.al-rm{font-size:.6rem;margin-left:2px;opacity:.4;cursor:pointer}.al-rm:hover{opacity:1}
+
+/* ── LAYOUT ── */
 .main{display:flex;flex:1;min-height:0}
-.map-wrap{flex:1;overflow:auto;background:#0a0f1a;cursor:crosshair}
+.map-wrap{flex:1;overflow:auto;background:var(--bg0);cursor:crosshair;position:relative;}
 canvas#map{display:block;image-rendering:pixelated}
 
-.side{width:240px;flex-shrink:0;background:#1e1e30;border-left:1px solid #2a2a4a;display:flex;flex-direction:column;overflow:hidden}
-.side-tabs{display:flex;border-bottom:1px solid #2a2a4a;flex-shrink:0}
-.tab{flex:1;padding:6px 2px;text-align:center;font-size:.67rem;cursor:pointer;color:#555;background:none;border:none;border-bottom:2px solid transparent}
-.tab.active{color:#4fc3f7;border-bottom-color:#4fc3f7}
-.tab-body{flex:1;overflow-y:auto;padding:9px;display:none}
-.tab-body.show{display:block}
+/* ── SIDEBAR ── */
+.side{
+  width:252px;flex-shrink:0;
+  background:var(--bg1);
+  border-left:1px solid var(--border);
+  display:flex;flex-direction:column;overflow:hidden;
+}
+.side-tabs{
+  display:flex;border-bottom:1px solid var(--border);flex-shrink:0;
+  background:linear-gradient(180deg,#040810 0%,#050a14 100%);
+}
+.tab{
+  flex:1;padding:8px 2px;text-align:center;font-size:.72rem;
+  cursor:pointer;color:#1e3050;background:none;border:none;
+  border-bottom:2px solid transparent;transition:all .15s;
+}
+.tab:hover{color:#334155}
+.tab.active{
+  color:var(--cyan);border-bottom-color:var(--cyan);
+  background:rgba(34,211,238,.04);
+  text-shadow:0 0 8px rgba(34,211,238,.4);
+}
 
-.sec{font-size:.64rem;font-weight:700;color:#4fc3f7;text-transform:uppercase;margin:8px 0 4px;letter-spacing:.4px;border-bottom:1px solid #1e2a4a;padding-bottom:3px;display:flex;align-items:center;justify-content:space-between}
+.tab-body{
+  flex:1;overflow-y:auto;padding:10px;display:none;
+  scrollbar-width:thin;scrollbar-color:var(--border) transparent;
+}
+.tab-body.show{display:block}
+::-webkit-scrollbar{width:3px;height:3px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+
+/* ── SECTION HEADERS ── */
+.sec{
+  font-size:.58rem;font-weight:700;color:var(--amber);
+  text-transform:uppercase;margin:10px 0 5px;letter-spacing:1.8px;
+  border-bottom:1px solid rgba(245,158,11,.15);padding-bottom:3px;
+  display:flex;align-items:center;justify-content:space-between;
+  font-family:'Rajdhani',sans-serif;
+}
 .sec:first-child{margin-top:0}
+.sec::before{content:'';display:inline-block;width:3px;height:3px;background:var(--amber);border-radius:50%;margin-right:5px;box-shadow:0 0 4px var(--amber)}
+
+/* ── FORM ── */
 .row{margin-bottom:5px}
-.row label{display:block;font-size:.67rem;color:#888;margin-bottom:2px}
-.row input[type=number],.row input[type=text]{width:100%;padding:3px 6px;background:#0d1b2e;border:1px solid #334;border-radius:3px;color:#eee;font-size:.77rem}
+.row label{
+  display:block;font-size:.58rem;color:#334155;
+  margin-bottom:2px;text-transform:uppercase;letter-spacing:.8px;
+  font-family:'Rajdhani',sans-serif;
+}
+.row input[type=number],.row input[type=text]{
+  width:100%;padding:4px 7px;
+  background:var(--bg0);border:1px solid var(--border);border-radius:2px;
+  color:var(--cyan);font-size:.74rem;font-family:'JetBrains Mono',monospace;
+  transition:all .15s;
+}
+.row input:focus{outline:none;border-color:var(--cyan-d);box-shadow:0 0 8px rgba(34,211,238,.08)}
 .duo{display:flex;gap:4px}.duo>div{flex:1}
 .trio{display:flex;gap:3px}.trio>div{flex:1}
-.suffix{color:#555;font-size:.6rem}
+.suffix{color:#1e3050;font-size:.58rem}
 
-/* 연맹 카드 (설정 탭) */
-.al-card{background:#0d1825;border-radius:5px;padding:7px;margin-bottom:8px;border-left:3px solid #334}
+input[type=datetime-local],input[type=date]{
+  width:100%;padding:4px 7px;background:var(--bg0);
+  border:1px solid var(--border);border-radius:2px;
+  color:var(--cyan);font-size:.7rem;font-family:'JetBrains Mono',monospace;
+}
+select{
+  background:var(--bg0);border:1px solid var(--border);border-radius:2px;
+  color:var(--txt);font-size:.7rem;padding:2px 4px;
+}
+
+/* ── CARDS ── */
+.al-card{
+  background:var(--bg2);border-radius:2px;padding:8px;margin-bottom:7px;
+  border-left:2px solid var(--border2);position:relative;
+}
+.al-card::after{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.04),transparent)}
 .al-card-hdr{display:flex;align-items:center;gap:6px;margin-bottom:6px}
-.al-name-input{flex:1;background:transparent;border:none;border-bottom:1px solid #334;color:#eee;font-size:.8rem;font-weight:700;padding:1px 3px}
-.al-name-input:focus{outline:none;border-bottom-color:#4fc3f7}
-.al-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
-.rm-btn{background:#3a1010;color:#ef9a9a;border:1px solid #7f0000;border-radius:3px;padding:2px 6px;font-size:.65rem;cursor:pointer;margin-left:auto}
-.rm-btn:hover{background:#7f0000;color:#fff}
+.al-name-input{
+  flex:1;background:transparent;border:none;
+  border-bottom:1px solid var(--border);color:var(--txt2);
+  font-size:.8rem;font-weight:700;padding:1px 3px;
+  font-family:'Rajdhani',sans-serif;letter-spacing:.5px;
+}
+.al-name-input:focus{outline:none;border-bottom-color:var(--amber)}
+.al-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.rm-btn{
+  background:rgba(239,68,68,.08);color:#f87171;
+  border:1px solid rgba(239,68,68,.2);border-radius:2px;
+  padding:2px 6px;font-size:.6rem;cursor:pointer;margin-left:auto;
+  font-family:'Rajdhani',sans-serif;transition:all .15s;
+}
+.rm-btn:hover{background:rgba(239,68,68,.2);color:#fff}
 
-/* 도시 아이템 */
-.city-item{background:#0d1825;border-radius:5px;padding:7px;margin-bottom:6px;border-left:3px solid #334}
+.city-item{
+  background:var(--bg2);border-radius:2px;padding:7px;
+  margin-bottom:5px;border-left:2px solid var(--border);
+}
 .city-hdr{display:flex;align-items:center;gap:5px;margin-bottom:5px}
-.city-hdr select{flex:1;background:#0d1b2e;border:1px solid #334;border-radius:3px;color:#eee;font-size:.72rem;padding:2px}
-.city-name-input{flex:1;background:transparent;border:none;border-bottom:1px solid #334;color:#eee;font-size:.75rem;padding:1px 3px}
-.city-name-input:focus{outline:none;border-bottom-color:#4fc3f7}
+.city-hdr select{flex:1}
+.city-name-input{
+  flex:1;background:transparent;border:none;
+  border-bottom:1px solid var(--border);color:var(--txt);
+  font-size:.72rem;padding:1px 3px;
+}
+.city-name-input:focus{outline:none;border-bottom-color:var(--cyan)}
 
-/* 결과 */
-.card{background:#0f1e35;border-radius:5px;padding:8px;margin-bottom:6px}
-.card-row{display:flex;justify-content:space-between;font-size:.77rem;margin:3px 0}
-.badge{display:inline-block;padding:2px 7px;border-radius:10px;font-size:.68rem;font-weight:700;margin-top:3px}
-.win{background:#1b5e20;color:#a5d6a7}.lose{background:#7f0000;color:#ffcdd2}.tie{background:#333;color:#ccc}
-table{width:100%;border-collapse:collapse;font-size:.64rem}
-th{background:#0d1b35;color:#90caf9;padding:3px 2px;text-align:center}
-td{padding:2px 3px;text-align:center;border-bottom:1px solid #1e3040}
-.warn{color:#ffb74d}.ok{color:#81c784}
-.posbar{font-size:.67rem;color:#4fc3f7;padding:2px 8px;background:#080e18;border-top:1px solid #1a2a3a;flex-shrink:0;height:20px}
+/* ── RESULT CARDS ── */
+.card{
+  background:var(--bg2);border-radius:2px;padding:8px;margin-bottom:5px;
+  border:1px solid var(--border);position:relative;overflow:hidden;
+}
+.card::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(34,211,238,.15),transparent);
+}
+.card-row{display:flex;justify-content:space-between;font-size:.71rem;margin:3px 0;gap:4px}
+.badge{
+  display:inline-block;padding:2px 8px;border-radius:1px;
+  font-size:.62rem;font-weight:700;margin-top:3px;
+  font-family:'Rajdhani',sans-serif;letter-spacing:1px;text-transform:uppercase;
+}
+.win{background:rgba(16,185,129,.12);color:#34d399;border:1px solid rgba(16,185,129,.25)}
+.lose{background:rgba(239,68,68,.08);color:#f87171;border:1px solid rgba(239,68,68,.18)}
+.tie{background:var(--bg3);color:#475569;border:1px solid var(--border)}
+
+table{width:100%;border-collapse:collapse;font-size:.62rem;font-family:'JetBrains Mono',monospace}
+th{
+  background:var(--bg0);color:var(--amber);padding:4px 2px;
+  text-align:center;font-family:'Rajdhani',sans-serif;font-size:.58rem;
+  letter-spacing:1px;text-transform:uppercase;border-bottom:1px solid var(--border);
+}
+td{padding:3px 2px;text-align:center;border-bottom:1px solid rgba(13,28,56,.6)}
+tr:hover td{background:rgba(34,211,238,.025)}
+.warn{color:#fbbf24}.ok{color:var(--green)}
+
+/* ── STATUS BAR ── */
+.posbar{
+  font-size:.6rem;color:#1e3050;padding:2px 10px;
+  background:var(--bg0);border-top:1px solid var(--border);
+  flex-shrink:0;height:20px;font-family:'JetBrains Mono',monospace;
+  display:flex;align-items:center;gap:8px;
+}
+.posbar::before{content:'◆';color:var(--amber);font-size:.5rem;opacity:.5}
 </style>
 </head>
 <body>
