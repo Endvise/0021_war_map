@@ -13,7 +13,7 @@
   --amber:#f59e0b;--amber-d:#78490a;
   --cyan:#22d3ee;--cyan-d:#0e4a5a;
   --green:#10b981;--red:#ef4444;
-  --txt:#94a3b8;--txt2:#cbd5e1;--txt3:#e2e8f0;
+  --txt:#b0bec5;--txt2:#e0e6ef;--txt3:#f0f4f8;
 }
 *{box-sizing:border-box;margin:0;padding:0}
 
@@ -58,7 +58,7 @@ header h1::before{content:'▸ ';color:var(--cyan);opacity:.7;}
   padding:3px 9px;border:1px solid var(--border2);border-radius:2px;
   cursor:pointer;font-size:.68rem;font-weight:600;white-space:nowrap;
   font-family:'Rajdhani',sans-serif;letter-spacing:.8px;text-transform:uppercase;
-  transition:all .15s;background:var(--bg2);color:#475569;
+  transition:all .15s;background:var(--bg2);color:#7a9abf;
 }
 .btn:hover{border-color:var(--cyan);color:var(--cyan);background:rgba(34,211,238,.05)}
 
@@ -84,7 +84,7 @@ header h1::before{content:'▸ ';color:var(--cyan);opacity:.7;}
 .btn-load{background:rgba(192,132,252,.06);color:#c084fc;border-color:rgba(139,92,246,.25)}
 .btn-load:hover{background:rgba(139,92,246,.2);border-color:#8b5cf6;color:#fff}
 
-.hint{font-size:.58rem;color:#1e2e48;margin-left:auto;font-family:'JetBrains Mono',monospace;}
+.hint{font-size:.58rem;color:#5a7a9a;margin-left:auto;font-family:'JetBrains Mono',monospace;}
 
 /* ── ALLIANCE BUTTONS ── */
 #allianceBtns{display:flex;gap:3px;flex-wrap:wrap}
@@ -115,10 +115,10 @@ canvas#map{display:block;image-rendering:pixelated}
 }
 .tab{
   flex:1;padding:8px 2px;text-align:center;font-size:.72rem;
-  cursor:pointer;color:#1e3050;background:none;border:none;
+  cursor:pointer;color:#3a6080;background:none;border:none;
   border-bottom:2px solid transparent;transition:all .15s;
 }
-.tab:hover{color:#334155}
+.tab:hover{color:#5a8aaa}
 .tab.active{
   color:var(--cyan);border-bottom-color:var(--cyan);
   background:rgba(34,211,238,.04);
@@ -148,7 +148,7 @@ canvas#map{display:block;image-rendering:pixelated}
 /* ── FORM ── */
 .row{margin-bottom:5px}
 .row label{
-  display:block;font-size:.58rem;color:#334155;
+  display:block;font-size:.58rem;color:#7a9abf;
   margin-bottom:2px;text-transform:uppercase;letter-spacing:.8px;
   font-family:'Rajdhani',sans-serif;
 }
@@ -161,7 +161,7 @@ canvas#map{display:block;image-rendering:pixelated}
 .row input:focus{outline:none;border-color:var(--cyan-d);box-shadow:0 0 8px rgba(34,211,238,.08)}
 .duo{display:flex;gap:4px}.duo>div{flex:1}
 .trio{display:flex;gap:3px}.trio>div{flex:1}
-.suffix{color:#1e3050;font-size:.58rem}
+.suffix{color:#4a6a8a;font-size:.58rem}
 
 input[type=datetime-local],input[type=date]{
   width:100%;padding:4px 7px;background:var(--bg0);
@@ -240,7 +240,7 @@ tr:hover td{background:rgba(34,211,238,.025)}
 
 /* ── STATUS BAR ── */
 .posbar{
-  font-size:.6rem;color:#1e3050;padding:2px 10px;
+  font-size:.6rem;color:#4a6a8a;padding:2px 10px;
   background:var(--bg0);border-top:1px solid var(--border);
   flex-shrink:0;height:20px;font-family:'JetBrains Mono',monospace;
   display:flex;align-items:center;gap:8px;
@@ -259,34 +259,34 @@ tr:hover td{background:rgba(34,211,238,.025)}
     <button class="btn" id="tmBuild"  onclick="setTowerMode('build')"
       style="background:#1565c0;color:#fff;border:1px solid #4fc3f7;padding:4px 8px">🔨 건설</button>
     <button class="btn" id="tmDemol"  onclick="setTowerMode('demolish')"
-      style="background:#1a2a3a;color:#90caf9;border:1px solid #334;padding:4px 8px">🔧 철거</button>
+      style="background:#1a2a3a;color:#a8d8ff;border:1px solid #334;padding:4px 8px">🔧 철거</button>
     <button class="btn" id="tmIgnite" onclick="setTowerMode('ignite')"
-      style="background:#1a2a3a;color:#ff9800;border:1px solid #334;padding:4px 8px">🔥 점화</button>
+      style="background:#1a2a3a;color:#ffae33;border:1px solid #334;padding:4px 8px">🔥 점화</button>
   </div>
   <button class="btn" onclick="undoTower()"
-    style="background:#37474f;color:#ccc;border:1px solid #455a64;padding:4px 9px">↩ 취소</button>
+    style="background:#37474f;color:#d4dce6;border:1px solid #455a64;padding:4px 9px">↩ 취소</button>
   <span class="sep">│</span>
   <span style="font-size:.68rem;color:#888">지형:</span>
   <div id="terrainModeBtns" style="display:flex;gap:3px">
     <button class="btn" id="tmRiver"    onclick="setTerrainMode('river')"
-      style="background:#1a2a3a;color:#42a5f5;border:1px solid #334;padding:4px 8px">🌊 강</button>
+      style="background:#1a2a3a;color:#a8d8ff;border:1px solid #334;padding:4px 8px">🌊 강</button>
     <button class="btn" id="tmBridge"   onclick="setTerrainMode('bridge')"
-      style="background:#1a2a3a;color:#8d6e63;border:1px solid #334;padding:4px 8px">🌉 다리</button>
+      style="background:#1a2a3a;color:#b09080;border:1px solid #334;padding:4px 8px">🌉 다리</button>
     <button class="btn" id="tmMountain" onclick="setTerrainMode('mountain')"
-      style="background:#1a2a3a;color:#90a4ae;border:1px solid #334;padding:4px 8px">⛰ 산</button>
+      style="background:#1a2a3a;color:#aec5d0;border:1px solid #334;padding:4px 8px">⛰ 산</button>
     <button class="btn" id="tmTerrainOff" onclick="setTerrainMode(null)"
-      style="background:#455a64;color:#ccc;border:1px solid #546e7a;padding:4px 8px">OFF</button>
+      style="background:#455a64;color:#d4dce6;border:1px solid #546e7a;padding:4px 8px">OFF</button>
   </div>
   <button class="btn" onclick="undoTerrain()"
-    style="background:#37474f;color:#ccc;border:1px solid #455a64;padding:4px 9px">↩ 지형</button>
+    style="background:#37474f;color:#d4dce6;border:1px solid #455a64;padding:4px 9px">↩ 지형</button>
   <span class="sep">│</span>
   <button class="btn btn-calc"  onclick="runSim()">▶ 계산</button>
   <button class="btn btn-reset" onclick="resetTowers()">🗑 초기화</button>
   <span class="sep">│</span>
   <span style="font-size:.68rem;color:#888">스냅:</span>
   <div id="snapBtns" style="display:flex;gap:3px">
-    <button class="btn" id="snap1" onclick="setSnap(1)" style="padding:3px 7px;background:#1a2a3a;color:#90caf9;border:1px solid #334">1×1</button>
-    <button class="btn" id="snap2" onclick="setSnap(2)" style="padding:3px 7px;background:#1a2a3a;color:#90caf9;border:1px solid #334">2×2</button>
+    <button class="btn" id="snap1" onclick="setSnap(1)" style="padding:3px 7px;background:#1a2a3a;color:#a8d8ff;border:1px solid #334">1×1</button>
+    <button class="btn" id="snap2" onclick="setSnap(2)" style="padding:3px 7px;background:#1a2a3a;color:#a8d8ff;border:1px solid #334">2×2</button>
     <button class="btn" id="snap3" onclick="setSnap(3)" style="padding:3px 7px;background:#1565c0;color:#fff;border:1px solid #4fc3f7">3×3</button>
   </div>
   <span class="hint">클릭:건설/철거/점화 | 휠:줌 | 영토드래그:이동</span>
@@ -324,11 +324,46 @@ tr:hover td{background:rgba(34,211,238,.025)}
         <div class="row"><label>타워 총 내구도</label><input id="tTowerHp"   type="number" value="7200"></div>
         <div class="row"><label>점화 감소<span class="suffix">(초당)</span></label><input id="tBurnRate" type="number" value="5"></div>
       </div>
-      <div style="font-size:.68rem;color:#666;background:#0d1420;border-radius:3px;padding:5px 7px;margin-bottom:4px">
-        💰 탑 비용: 1~5→10.5k │ 6~10→17.5k │ 11~15→21k<br>
-        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;16~25→24.5k │ 26~30→28k │ 31~35→30.7k<br>
-        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;36~40→36.4k │ 41+→42k
-      </div>
+      <div style="margin-bottom:8px">
+  <div style="font-size:.58rem;font-weight:700;color:var(--amber);text-transform:uppercase;letter-spacing:1.8px;border-bottom:1px solid rgba(245,158,11,.15);padding-bottom:3px;margin-bottom:5px;font-family:'Rajdhani',sans-serif;display:flex;align-items:center;gap:5px">
+    <span style="display:inline-block;width:3px;height:3px;background:var(--amber);border-radius:50%;box-shadow:0 0 4px var(--amber)"></span>
+    💰 탑 건설 비용
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:3px">
+    <div style="background:#0a1828;border:1px solid #1a2e48;border-radius:2px;padding:4px 6px;display:flex;justify-content:space-between;align-items:center">
+      <span style="font-size:.6rem;color:#5a7a9a;font-family:'Rajdhani',sans-serif">1~5번</span>
+      <span style="font-size:.66rem;color:var(--cyan);font-family:'JetBrains Mono',monospace;font-weight:600">10.5k</span>
+    </div>
+    <div style="background:#0a1828;border:1px solid #1a2e48;border-radius:2px;padding:4px 6px;display:flex;justify-content:space-between;align-items:center">
+      <span style="font-size:.6rem;color:#5a7a9a;font-family:'Rajdhani',sans-serif">6~10번</span>
+      <span style="font-size:.66rem;color:var(--cyan);font-family:'JetBrains Mono',monospace;font-weight:600">17.5k</span>
+    </div>
+    <div style="background:#0a1828;border:1px solid #1a2e48;border-radius:2px;padding:4px 6px;display:flex;justify-content:space-between;align-items:center">
+      <span style="font-size:.6rem;color:#5a7a9a;font-family:'Rajdhani',sans-serif">11~15번</span>
+      <span style="font-size:.66rem;color:var(--cyan);font-family:'JetBrains Mono',monospace;font-weight:600">21k</span>
+    </div>
+    <div style="background:#0a1828;border:1px solid #1a2e48;border-radius:2px;padding:4px 6px;display:flex;justify-content:space-between;align-items:center">
+      <span style="font-size:.6rem;color:#5a7a9a;font-family:'Rajdhani',sans-serif">16~25번</span>
+      <span style="font-size:.66rem;color:var(--cyan);font-family:'JetBrains Mono',monospace;font-weight:600">24.5k</span>
+    </div>
+    <div style="background:#0a1828;border:1px solid #1a2e48;border-radius:2px;padding:4px 6px;display:flex;justify-content:space-between;align-items:center">
+      <span style="font-size:.6rem;color:#5a7a9a;font-family:'Rajdhani',sans-serif">26~30번</span>
+      <span style="font-size:.66rem;color:var(--cyan);font-family:'JetBrains Mono',monospace;font-weight:600">28k</span>
+    </div>
+    <div style="background:#0a1828;border:1px solid #1a2e48;border-radius:2px;padding:4px 6px;display:flex;justify-content:space-between;align-items:center">
+      <span style="font-size:.6rem;color:#5a7a9a;font-family:'Rajdhani',sans-serif">31~35번</span>
+      <span style="font-size:.66rem;color:var(--cyan);font-family:'JetBrains Mono',monospace;font-weight:600">30.7k</span>
+    </div>
+    <div style="background:#0a1828;border:1px solid #1a2e48;border-radius:2px;padding:4px 6px;display:flex;justify-content:space-between;align-items:center">
+      <span style="font-size:.6rem;color:#5a7a9a;font-family:'Rajdhani',sans-serif">36~40번</span>
+      <span style="font-size:.66rem;color:var(--cyan);font-family:'JetBrains Mono',monospace;font-weight:600">36.4k</span>
+    </div>
+    <div style="background:#0a1828;border:1px solid #1a2e48;border-radius:2px;padding:4px 6px;display:flex;justify-content:space-between;align-items:center">
+      <span style="font-size:.6rem;color:#5a7a9a;font-family:'Rajdhani',sans-serif">41번+</span>
+      <span style="font-size:.66rem;color:var(--amber);font-family:'JetBrains Mono',monospace;font-weight:600">42k</span>
+    </div>
+  </div>
+</div>
 
       <div class="sec">
         <span>🏙 점령 기지</span>
@@ -484,7 +519,7 @@ function setSnap(s) {
   [1,2,3].forEach(n => {
     const btn = document.getElementById('snap'+n);
     btn.style.background = n===s ? '#1565c0' : '#1a2a3a';
-    btn.style.color       = n===s ? '#fff'    : '#90caf9';
+    btn.style.color       = n===s ? '#fff'    : '#a8d8ff';
     btn.style.borderColor = n===s ? '#4fc3f7' : '#334';
   });
 }
@@ -1203,6 +1238,26 @@ mapWrap.addEventListener('wheel',e=>{
   mapWrap.scrollLeft=rx*canvas.width-(e.clientX-rect.left);
   mapWrap.scrollTop=ry*canvas.height-(e.clientY-rect.top);
 },{passive:false});
+
+// ── 중간 마우스 버튼 드래그로 맵 뷰 이동 ──────────────
+let mmDrag=null;
+mapWrap.addEventListener('mousedown',e=>{
+  if(e.button!==1) return;
+  e.preventDefault();
+  mmDrag={startX:e.clientX,startY:e.clientY,sl:mapWrap.scrollLeft,st:mapWrap.scrollTop};
+  mapWrap.style.cursor='grabbing';
+},{passive:false});
+document.addEventListener('mousemove',e=>{
+  if(!mmDrag) return;
+  mapWrap.scrollLeft=mmDrag.sl-(e.clientX-mmDrag.startX);
+  mapWrap.scrollTop=mmDrag.st-(e.clientY-mmDrag.startY);
+});
+document.addEventListener('mouseup',e=>{
+  if(e.button!==1||!mmDrag) return;
+  mmDrag=null;
+  mapWrap.style.cursor='crosshair';
+});
+mapWrap.addEventListener('auxclick',e=>e.preventDefault());
 
 // ── 연맹 관리 ─────────────────────────────────────────
 function addAlliance(){
