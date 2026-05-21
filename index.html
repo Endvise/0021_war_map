@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>⚔ WAR MAP — SLG 전장 시뮬레이터</title>
+<title>⚔ WAR MAP — IR 시뮬레이터</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&family=Share+Tech+Mono&display=swap" rel="stylesheet">
 <style>
@@ -277,7 +277,7 @@ tr:hover td{background:rgba(34,211,238,.025)}
 <header>
   <!-- 1행: 연맹·타워모드·계산·스냅 -->
   <div class="hdr-row">
-    <h1>⚔️ SLG 시뮬레이터</h1>
+    <h1>⚔️ IR 시뮬레이터</h1>
     <span class="sep">│</span>
     <div id="allianceBtns"></div>
     <span class="sep">│</span>
@@ -1200,6 +1200,12 @@ canvas.addEventListener('mousedown',e=>{
 
 canvas.addEventListener('mousemove',e=>{
   const raw=getRaw(e);
+  if(allyMode){ // 동맹 설정 모드 중 드래그 방지
+    const hit=hitTest(raw.x,raw.y);
+    canvas.style.cursor=hit&&hit.type==='helipad'?'pointer':'crosshair';
+    document.getElementById('posBar').textContent=`좌표: (${Math.round(raw.x)}, ${Math.round(raw.y)})`;
+    draw(); return;
+  }
   if(terrainMode&&drawingTerrain){
     drawingTerrain.x2=raw.x; drawingTerrain.y2=raw.y;
     draw(); return;
@@ -1222,6 +1228,7 @@ canvas.addEventListener('mousemove',e=>{
 
 canvas.addEventListener('mouseup',e=>{
   if(e.button!==0) return;
+  if(allyMode){ drag={}; isDragging=false; return; }
   if(terrainMode&&drawingTerrain){
     const raw=getRaw(e);
     const dx=Math.abs(raw.x-drawingTerrain.x1),dy=Math.abs(raw.y-drawingTerrain.y1);
@@ -1249,7 +1256,7 @@ canvas.addEventListener('mouseup',e=>{
         const idx=findNearestTower(al.towers,g.x,g.y);
         if(idx>=0){
           const t=al.towers[idx];
-          const cost=getTowerCost(al.towerCount+idx+1);
+          const cost=getTowerCost(al.towers.length);
           al.cement=+(al.cement+(cost/1000)*0.5).toFixed(1); // 50% 반환
           al.towers.splice(idx,1);
           renderCfgTab();
@@ -1379,32 +1386,25 @@ function renderCfgTab(){
       <div class="al-card-hdr">
         <span class="al-dot" style="background:${al.color}"></span>
         <input class="al-name-input" value="${al.name}" oninput="alliances[${i}].name=this.value;renderAllianceBtns()">
-        <button class="rm-btn" onclick="removeAlliance(${i})">제거</button>
       </div>
       <div class="duo">
         <div class="row"><label>현재 시멘트<span class="suffix">(k)</span></label>
           <input type="number" value="${al.cement}" oninput="alliances[${i}].cement=+this.value"></div>
-        <div class="row"><label>현재 타워 수</label>
-          <input type="number" value="${al.towerCount}" oninput="alliances[${i}].towerCount=+this.value;renderCfgTab()"></div>
+        <div class="row"><label>배치 타워 수<span class="suffix">(맵 자동)</span></label>
+          <input type="number" value="${al.towers.length}" readonly
+            style="opacity:.6;cursor:not-allowed"></div>
       </div>
       ${(()=>{
-        const conn=getConnectedCities(al.towers.length>0?al.towers:[{x:al.helipad.x,y:al.helipad.y}]);
+        const conn=getConnectedCities(al.towers.length>0?al.towers:[{x:al.helipad.x+al.helipad.r/2,y:al.helipad.y-al.helipad.r/2}]);
         const prod=calcProdFromSet(conn);
         const cityLabels=[...conn].map(ci=>cities[ci]?.label||'').filter(Boolean).join(', ')||'없음';
+        const nextCost=getTowerCost(al.towers.length+1);
         return `<div style="font-size:.7rem;background:#0d1b2e;border-radius:3px;padding:5px 7px;margin-bottom:6px;line-height:1.6">
           🏙 연결 도시: <span style="color:#ffd54f">${cityLabels}</span><br>
           📦 분당 생산량: <strong style="color:#90caf9">${prod}/분</strong>
-          &nbsp;│&nbsp; 다음 탑 비용: <strong style="color:#ef9a9a">${getTowerCost(al.towerCount+1).toLocaleString()}</strong>
+          &nbsp;│&nbsp; 다음 탑 비용: <strong style="color:#ef9a9a">${nextCost.toLocaleString()}</strong>
         </div>`;
       })()}
-      <div class="duo">
-        <div class="row"><label>라인끝 X</label>
-          <input type="number" value="${al.helipad.x}" oninput="alliances[${i}].helipad.x=+this.value;draw()"></div>
-        <div class="row"><label>라인끝 Y</label>
-          <input type="number" value="${al.helipad.y}" oninput="alliances[${i}].helipad.y=+this.value;draw()"></div>
-      </div>
-      <div class="row"><label>헬기장 반경</label>
-        <input type="number" value="${al.helipad.r}" oninput="alliances[${i}].helipad.r=+this.value;draw()"></div>
     </div>`).join('');
 }
 
@@ -1510,8 +1510,8 @@ function runSim(){
   const tx=G('tgtX'),ty=G('tgtY'),bm=G('tBuildMin');
   const results=alliances.map(al=>{
     const res=al.towers.length>0
-      ?calcFromPlaced(al.towers,al.cement,bm,al.towerCount,al.helipad.x+al.helipad.r/2,al.helipad.y-al.helipad.r/2)
-      :calcPath(al.helipad.x+al.helipad.r/2,al.helipad.y-al.helipad.r/2,tx,ty,al.cement,bm,al.towerCount);
+      ?calcFromPlaced(al.towers,al.cement,bm,al.towers.length,al.helipad.x+al.helipad.r/2,al.helipad.y-al.helipad.r/2)
+      :calcPath(al.helipad.x+al.helipad.r/2,al.helipad.y-al.helipad.r/2,tx,ty,al.cement,bm,al.towers.length);
     return {al,res};
   });
   lastSimResults=results;
@@ -1592,6 +1592,7 @@ let allySelected = new Set(); // 선택된 alliance index set
 
 function enterAllyMode(){
   allyMode=true; allySelected.clear();
+  drag={}; isDragging=false; // 이전 drag 상태 초기화
   document.getElementById('allyModeBtn').style.display='none';
   document.getElementById('allyConfirmBtn').style.display='';
   document.getElementById('allyCancelBtn').style.display='';
