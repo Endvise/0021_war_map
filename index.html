@@ -570,7 +570,7 @@ let cities = [
   { id:10, level:7, label:'7도시-3', color:'#ffd54f', x:279, y:188, r:15, owner:null, prism:450 },
   { id:11, level:7, label:'7도시-4', color:'#ffd54f', x:159, y:188, r:15, owner:null, prism:450 },
   // 8도시 1개 — 7도시 중심
-  { id:12, level:8, label:'8도시',   color:'#ff8a65', x:204, y:230, r:15, owner:null }
+  { id:12, level:8, label:'8도시',   color:'#ff8a65', x:219, y:231, r:15, owner:null }
 ];
 let cityIdSeq = 13;
 
@@ -872,7 +872,7 @@ function saveLS(){
   clearTimeout(_lsTimer);
   _lsTimer=setTimeout(()=>{
     try{
-      localStorage.setItem('war_map_v1',JSON.stringify({
+      localStorage.setItem('war_map_v2',JSON.stringify({
         mapW:MAP_W,mapH:MAP_H,
         buildMin:document.getElementById('tBuildMin').value,
         burnMin:document.getElementById('tBurnMin').value,
@@ -888,7 +888,7 @@ function saveLS(){
 
 function loadLS(){
   try{
-    const raw=localStorage.getItem('war_map_v1');
+    const raw=localStorage.getItem('war_map_v2');
     if(!raw) return;
     const d=JSON.parse(raw);
     MAP_W=d.mapW||398; MAP_H=d.mapH||404;
