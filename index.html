@@ -345,20 +345,29 @@ tr:hover td{background:rgba(34,211,238,.025)}
       style="background:#37474f;color:#d4dce6;border:1px solid #455a64;padding:2px 9px">↩ 지형</button>
     <span class="hint" style="margin-left:auto">클릭:건설/철거/점화 | 휠클릭:맵이동 | 휠:줌 | 영토드래그:이동 | 도시우클릭:소유권</span>
   </div>
-  <!-- 3행: 실시간 동기화 -->
-  <div class="hdr-row" style="gap:6px;min-height:28px;padding:2px 0">
-    <span style="font-size:.6rem;color:#5a7a9a;letter-spacing:.5px">📡 전장코드:</span>
-    <input id="syncRoomInput" type="text" placeholder="예: BATTLE01" maxlength="16"
-      style="width:90px;padding:2px 6px;background:#050a14;border:1px solid #1a2e50;border-radius:2px;
-             color:#60a5fa;font-size:.72rem;font-family:'JetBrains Mono',monospace;text-transform:uppercase"
-      oninput="this.value=this.value.toUpperCase()"
-      onkeydown="if(event.key==='Enter')connectRoom(this.value)">
-    <button class="btn" onclick="connectRoom(document.getElementById('syncRoomInput').value)"
-      style="padding:2px 8px;font-size:.65rem;background:rgba(96,165,250,.1);color:#60a5fa;border-color:rgba(96,165,250,.3)">연결</button>
-    <button class="btn" onclick="disconnectRoom()"
-      style="padding:2px 8px;font-size:.65rem;background:#0d1020;color:#3a5a7a;border-color:#1a2e50">해제</button>
+  <!-- 3행: 전장 세션 -->
+  <div class="hdr-row" style="gap:6px;min-height:28px;padding:2px 0;align-items:center">
+    <button class="btn" onclick="createNewBattle()"
+      style="padding:2px 10px;font-size:.68rem;background:rgba(74,222,128,.08);color:#4ade80;border-color:rgba(74,222,128,.3)">+ 새 전장</button>
+    <span class="sep">│</span>
     <span id="syncStatus" style="font-size:.63rem;color:#3a5a7a;font-family:'JetBrains Mono',monospace">⚫ 미연결</span>
-    <span id="syncUserCount" style="font-size:.6rem;color:#3a5a7a"></span>
+    <span id="seedDisplay" style="display:none;align-items:center;gap:4px">
+      <span style="font-size:.6rem;color:#5a7a9a">전장번호:</span>
+      <span id="seedNumber" style="font-family:'JetBrains Mono',monospace;font-size:.8rem;color:#fbbf24;font-weight:700;letter-spacing:1px"></span>
+      <button id="copySeedBtn" onclick="copySeed()"
+        style="padding:1px 6px;font-size:.6rem;background:rgba(251,191,36,.08);color:#fbbf24;border:1px solid rgba(251,191,36,.3);border-radius:3px;cursor:pointer">📋</button>
+      <button onclick="disconnectRoom()"
+        style="padding:1px 6px;font-size:.6rem;background:#0d1020;color:#3a5a7a;border:1px solid #1a2e50;border-radius:3px;cursor:pointer">나가기</button>
+    </span>
+    <span id="syncUserCount" style="font-size:.6rem;color:#4ade80"></span>
+    <span class="sep">│</span>
+    <span style="font-size:.6rem;color:#5a7a9a">참여:</span>
+    <input id="joinSeedInput" type="text" placeholder="전장번호" maxlength="8"
+      style="width:70px;padding:2px 6px;background:#050a14;border:1px solid #1a2e50;border-radius:2px;
+             color:#60a5fa;font-size:.72rem;font-family:'JetBrains Mono',monospace"
+      onkeydown="if(event.key==='Enter')joinBattle()">
+    <button class="btn" onclick="joinBattle()"
+      style="padding:2px 8px;font-size:.65rem;background:rgba(96,165,250,.1);color:#60a5fa;border-color:rgba(96,165,250,.3)">→</button>
     <button class="btn" onclick="showHelp()"
       style="margin-left:auto;padding:2px 8px;font-size:.68rem;background:rgba(255,255,255,.05);color:#5a7a9a;border-color:#1a2e50;border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-weight:bold">?</button>
   </div>
@@ -2616,6 +2625,7 @@ const _fbDb = firebase.database();
 
 let _syncRoomId = null;
 let _syncRef = null;
+let _usersRef = null;
 let _isSyncing = false;
 let _syncTimer = null;
 let _myUid = sessionStorage.getItem('war_uid') || (() => {
@@ -2650,32 +2660,67 @@ function connectRoom(roomId) {
   const presRef = _fbDb.ref('rooms/' + roomId + '/users/' + _myUid);
   presRef.set({t: Date.now()});
   presRef.onDisconnect().remove();
-  _fbDb.ref('rooms/' + roomId + '/users').on('value', snap => {
+  _usersRef = _fbDb.ref('rooms/' + roomId + '/users');
+  _usersRef.on('value', snap => {
     const n = snap.numChildren();
     const el = document.getElementById('syncUserCount');
     if(el) el.textContent = n > 0 ? `👥 ${n}명` : '';
   });
 
-  document.getElementById('syncRoomInput').value = roomId;
+  _updateSeedDisplay(roomId);
   _setSyncStatus('연결됨');
 }
 
 function disconnectRoom() {
   if(_syncRef) { _syncRef.off(); _syncRef = null; }
+  if(_usersRef) { _usersRef.off(); _usersRef = null; }
   if(_syncRoomId) {
     _fbDb.ref('rooms/' + _syncRoomId + '/users/' + _myUid).remove();
-    _fbDb.ref('rooms/' + _syncRoomId + '/users').off();
   }
   _syncRoomId = null;
+  sessionStorage.removeItem('war_seed');
   _setSyncStatus('미연결');
-  const el = document.getElementById('syncUserCount');
-  if(el) el.textContent = '';
+  const uc = document.getElementById('syncUserCount');
+  if(uc) uc.textContent = '';
+  const sd = document.getElementById('seedDisplay');
+  if(sd) sd.style.display = 'none';
+}
+
+function createNewBattle() {
+  if(_syncRoomId && !confirm('현재 전장에서 나가고 새 전장을 만들겠습니까?')) return;
+  const seed = String(Math.floor(100000 + Math.random() * 900000));
+  sessionStorage.setItem('war_seed', seed);
+  connectRoom(seed);
+}
+
+function joinBattle() {
+  const seed = document.getElementById('joinSeedInput').value.trim().replace(/[^A-Z0-9]/gi,'').toUpperCase().slice(0,8);
+  if(!seed) return;
+  sessionStorage.setItem('war_seed', seed);
+  document.getElementById('joinSeedInput').value = '';
+  connectRoom(seed);
+}
+
+function copySeed() {
+  if(!_syncRoomId) return;
+  navigator.clipboard.writeText(_syncRoomId).then(() => {
+    const btn = document.getElementById('copySeedBtn');
+    if(btn) { btn.textContent = '✓'; setTimeout(() => btn.textContent = '📋', 1200); }
+  });
+}
+
+function _updateSeedDisplay(seed) {
+  const sd = document.getElementById('seedDisplay');
+  const sn = document.getElementById('seedNumber');
+  if(sd) sd.style.display = 'flex';
+  if(sn) sn.textContent = seed;
 }
 
 function syncPush() {
   if(_isSyncing || !_syncRoomId) return;
   clearTimeout(_syncTimer);
   _syncTimer = setTimeout(() => {
+    if(!_syncRef) return;
     _syncRef.set({
       alliances, cities, relations, waypoints, terrains,
       _uid: _myUid, _ts: Date.now()
@@ -2705,6 +2750,11 @@ renderCfgTab();
 renderCityList();
 resizeCanvas();
 draw();
+// 이전 세션 시드 자동 재연결 (한 틱 후 — loadLS 완료 보장)
+setTimeout(() => {
+  const _savedSeed = sessionStorage.getItem('war_seed');
+  if(_savedSeed) connectRoom(_savedSeed);
+}, 0);
 
 // 타워 상태 tick — 1초마다
 function tickTowers(){
