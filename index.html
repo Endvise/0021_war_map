@@ -451,8 +451,9 @@ function checkCityConn(tx, ty, connectedSet) {
   const newlyConnected = [];
   cities.forEach((c, ci) => {
     if (connectedSet.has(ci)) return;
-    const gx = Math.max(0, Math.abs(tx - c.x) - (TS/2 + c.r));
-    const gy = Math.max(0, Math.abs(ty - c.y) - (TS/2 + c.r));
+    const cx_c = c.x + c.r/2, cy_c = c.y - c.r/2; // 도시 중심
+    const gx = Math.max(0, Math.abs(tx - cx_c) - (TS/2 + c.r/2));
+    const gy = Math.max(0, Math.abs(ty - cy_c) - (TS/2 + c.r/2));
     if (gx <= GAP && gy <= GAP) {
       connectedSet.add(ci);
       newlyConnected.push(ci);
@@ -494,19 +495,19 @@ const MIN_PPC = 1, MAX_PPC = 16;
 // ── 연맹 상태 ─────────────────────────────────────────
 function makeAlliance(id, name, color, hx, hy) {
   return { id, name, color, towers:[],
-    helipad:{x:hx, y:hy, r:7.5},
+    helipad:{x:hx, y:hy, r:15},
     cement:100, towerCount:20, cities6:0, cities7:0, cities8:0,
     prismCoins:0, coinChaseUsed:0, coinChaseLastUTC:null };
 }
 let alliances = [
-  makeAlliance(0,'A 연맹', AL_COLORS[0],  91.5, 363.5),
-  makeAlliance(1,'B 연맹', AL_COLORS[1], 226.5, 357.5),
-  makeAlliance(2,'C 연맹', AL_COLORS[2], 370.5, 318.5),
-  makeAlliance(3,'D 연맹', AL_COLORS[3], 376.5, 186.5),
-  makeAlliance(4,'E 연맹', AL_COLORS[4], 358.5,  81.5),
-  makeAlliance(5,'F 연맹', AL_COLORS[5], 226.5,  78.5),
-  makeAlliance(6,'G 연맹', AL_COLORS[6],  97.5,  78.5),
-  makeAlliance(7,'H 연맹', AL_COLORS[7],  76.5, 249.5),
+  makeAlliance(0,'A 연맹', AL_COLORS[0],  84, 371),
+  makeAlliance(1,'B 연맹', AL_COLORS[1], 219, 365),
+  makeAlliance(2,'C 연맹', AL_COLORS[2], 363, 326),
+  makeAlliance(3,'D 연맹', AL_COLORS[3], 369, 194),
+  makeAlliance(4,'E 연맹', AL_COLORS[4], 351,  89),
+  makeAlliance(5,'F 연맹', AL_COLORS[5], 219,  86),
+  makeAlliance(6,'G 연맹', AL_COLORS[6],  90,  86),
+  makeAlliance(7,'H 연맹', AL_COLORS[7],  69, 257),
 ];
 let alIdSeq   = 8;
 let activeIdx = 0;
@@ -551,25 +552,25 @@ function getRanking() {
 }
 
 // ── 도시 상태 ─────────────────────────────────────────
-// 맵 398×404 (x:0~398, y:0~404), 좌하단=원점, 영토 15×15 (r=7.5)
-// 입력 좌표 = 영토 좌상단 → 중심 = (x+7.5, y-7.5)
+// 맵 398×404 (x:0~398, y:0~404), 좌하단=원점
+// 좌표 = 영토 좌상단, r = 영토 한 변 길이(15)
 let cities = [
   // 6도시 8개
-  { id:0,  level:6, label:'6도시-1', color:'#aed581', x:115.5, y:330.5, r:7.5, owner:null },
-  { id:1,  level:6, label:'6도시-2', color:'#aed581', x:217.5, y:324.5, r:7.5, owner:null },
-  { id:2,  level:6, label:'6도시-3', color:'#aed581', x:337.5, y:330.5, r:7.5, owner:null },
-  { id:3,  level:6, label:'6도시-4', color:'#aed581', x:361.5, y:219.5, r:7.5, owner:null },
-  { id:4,  level:6, label:'6도시-5', color:'#aed581', x:334.5, y:114.5, r:7.5, owner:null },
-  { id:5,  level:6, label:'6도시-6', color:'#aed581', x:226.5, y:111.5, r:7.5, owner:null },
-  { id:6,  level:6, label:'6도시-7', color:'#aed581', x:118.5, y:111.5, r:7.5, owner:null },
-  { id:7,  level:6, label:'6도시-8', color:'#aed581', x: 97.5, y:216.5, r:7.5, owner:null },
+  { id:0,  level:6, label:'6도시-1', color:'#aed581', x:108, y:338, r:15, owner:null },
+  { id:1,  level:6, label:'6도시-2', color:'#aed581', x:210, y:332, r:15, owner:null },
+  { id:2,  level:6, label:'6도시-3', color:'#aed581', x:330, y:338, r:15, owner:null },
+  { id:3,  level:6, label:'6도시-4', color:'#aed581', x:354, y:227, r:15, owner:null },
+  { id:4,  level:6, label:'6도시-5', color:'#aed581', x:327, y:122, r:15, owner:null },
+  { id:5,  level:6, label:'6도시-6', color:'#aed581', x:219, y:119, r:15, owner:null },
+  { id:6,  level:6, label:'6도시-7', color:'#aed581', x:111, y:119, r:15, owner:null },
+  { id:7,  level:6, label:'6도시-8', color:'#aed581', x: 90, y:224, r:15, owner:null },
   // 7도시 4개
-  { id:8,  level:7, label:'7도시-1', color:'#ffd54f', x:166.5, y:264.5, r:7.5, owner:null, prism:450 },
-  { id:9,  level:7, label:'7도시-2', color:'#ffd54f', x:286.5, y:264.5, r:7.5, owner:null, prism:450 },
-  { id:10, level:7, label:'7도시-3', color:'#ffd54f', x:286.5, y:180.5, r:7.5, owner:null, prism:450 },
-  { id:11, level:7, label:'7도시-4', color:'#ffd54f', x:166.5, y:180.5, r:7.5, owner:null, prism:450 },
-  // 8도시 1개 — 7도시 4개의 중심
-  { id:12, level:8, label:'8도시',   color:'#ff8a65', x:226.5, y:222.5, r:7.5, owner:null }
+  { id:8,  level:7, label:'7도시-1', color:'#ffd54f', x:159, y:272, r:15, owner:null, prism:450 },
+  { id:9,  level:7, label:'7도시-2', color:'#ffd54f', x:279, y:272, r:15, owner:null, prism:450 },
+  { id:10, level:7, label:'7도시-3', color:'#ffd54f', x:279, y:188, r:15, owner:null, prism:450 },
+  { id:11, level:7, label:'7도시-4', color:'#ffd54f', x:159, y:188, r:15, owner:null, prism:450 },
+  // 8도시 1개 — 7도시 중심
+  { id:12, level:8, label:'8도시',   color:'#ff8a65', x:204, y:230, r:15, owner:null }
 ];
 let cityIdSeq = 13;
 
@@ -619,14 +620,15 @@ function clearSimTime(){ simTime=null; document.getElementById('simTimeInput').v
 let burnTowers=[], burnIdSeq=0;
 let terrains=[], terrainIdSeq=0, terrainMode=null, drawingTerrain=null;
 
+// x,y = 좌상단, r = 한 변 길이 → 히트 판정
 function hitTest(gx,gy) {
   for (let i=0;i<alliances.length;i++) {
     const h=alliances[i].helipad;
-    if (Math.abs(gx-h.x)<=h.r && Math.abs(gy-h.y)<=h.r) return {type:'helipad',idx:i};
+    if (gx>=h.x && gx<=h.x+h.r && gy>=h.y-h.r && gy<=h.y) return {type:'helipad',idx:i};
   }
   for (let i=0;i<cities.length;i++) {
     const c=cities[i];
-    if (Math.abs(gx-c.x)<=c.r && Math.abs(gy-c.y)<=c.r) return {type:'city',idx:i};
+    if (gx>=c.x && gx<=c.x+c.r && gy>=c.y-c.r && gy<=c.y) return {type:'city',idx:i};
   }
   return null;
 }
@@ -641,14 +643,17 @@ function draw() {
   alliances.forEach(al => drawRect(al.helipad.x,al.helipad.y,al.helipad.r,al.color,'🚁',al.name));
   // 관계설정 기준 연맹 선택 표시
   if(relSrcIdx!==null&&alliances[relSrcIdx]){
-    const h=alliances[relSrcIdx].helipad, {cx,cy}=toC(h.x,h.y);
+    const h=alliances[relSrcIdx].helipad;
+    const {cx,cy}=toC(h.x,h.y);           // canvas 좌상단
+    const spx=h.r*ppc;
+    const ecx=cx+spx/2, ecy=cy+spx/2;     // canvas 중심
     ctx.strokeStyle='#ffd54f'; ctx.lineWidth=3; ctx.setLineDash([5,3]);
-    ctx.beginPath(); ctx.arc(cx,cy,h.r*ppc+ppc*4,0,Math.PI*2); ctx.stroke();
+    ctx.beginPath(); ctx.arc(ecx,ecy,spx/2+ppc*4,0,Math.PI*2); ctx.stroke();
     ctx.setLineDash([]);
     if(ppc>=2){
       ctx.fillStyle='#ffd54f'; ctx.font=`bold ${ppc*2}px sans-serif`;
       ctx.textAlign='center'; ctx.textBaseline='bottom';
-      ctx.fillText('기준: '+alliances[relSrcIdx].name, cx, cy-h.r*ppc-ppc*5);
+      ctx.fillText('기준: '+alliances[relSrcIdx].name, ecx, cy-ppc*5);
     }
   }
   // 도시 (점령 연맹 색상 + 연결 여부 표시)
@@ -693,49 +698,48 @@ function drawGrid() {
 
 function cityEmoji(lv){return lv===6?'6️⃣':lv===7?'7️⃣':'8️⃣';}
 
+// x,y = 영토 좌상단(게임좌표), r = 영토 한 변 길이
 function drawRect(x,y,r,color,emoji,label,connAlliances=[],owner=null){
-  const {cx,cy}=toC(x,y), rpx=r*ppc;
+  const {cx,cy}=toC(x,y);          // canvas 좌상단
+  const spx=r*ppc;                  // 한 변(px)
+  const ecx=cx+spx/2, ecy=cy+spx/2; // canvas 중심
   const isOwned = owner!=null;
   const isConn  = connAlliances.length>0;
 
-  // 배경 (점령 시 더 진하게)
   ctx.fillStyle = isOwned ? color+'55' : isConn ? color+'30' : color+'18';
-  ctx.fillRect(cx-rpx,cy-rpx,rpx*2,rpx*2);
+  ctx.fillRect(cx,cy,spx,spx);
 
-  // 테두리 (점령 시 굵게)
   ctx.strokeStyle = color+(isOwned?'ff':isConn?'cc':'55');
   ctx.lineWidth   = isOwned ? 2.5 : isConn ? 1.5 : 1;
-  ctx.strokeRect(cx-rpx,cy-rpx,rpx*2,rpx*2);
+  ctx.strokeRect(cx,cy,spx,spx);
 
-  // 점령 연맹 이름 배지
   if (isOwned && ppc>=2) {
-    const bw = Math.min(rpx*1.6, ppc*14);
+    const bw = Math.min(spx*0.9, ppc*14);
     ctx.fillStyle = owner.color+'cc';
-    ctx.fillRect(cx-bw/2, cy-rpx-ppc*3, bw, ppc*3);
+    ctx.fillRect(ecx-bw/2, cy-ppc*3, bw, ppc*3);
     ctx.fillStyle = '#fff';
     ctx.font = `bold ${Math.max(6,ppc*1.8)}px sans-serif`;
     ctx.textAlign='center'; ctx.textBaseline='middle';
-    ctx.fillText(owner.name, cx, cy-rpx-ppc*1.5);
+    ctx.fillText(owner.name, ecx, cy-ppc*1.5);
   }
 
-  // 연결 연맹 색상 점
   if (isConn && !isOwned) {
     connAlliances.forEach((al,i)=>{
       ctx.fillStyle=al.color;
       ctx.beginPath();
-      ctx.arc(cx-rpx+ppc*2+i*ppc*3.5, cy-rpx-ppc*1.5, ppc*1.2, 0, Math.PI*2);
+      ctx.arc(cx+ppc*2+i*ppc*3.5, cy-ppc*1.5, ppc*1.2, 0, Math.PI*2);
       ctx.fill();
     });
   }
 
   if (ppc>=2){
-    ctx.font=`${Math.max(10,rpx*.7)}px sans-serif`;
+    ctx.font=`${Math.max(10,spx*.35)}px sans-serif`;
     ctx.textAlign='center'; ctx.textBaseline='middle';
     ctx.fillStyle=color+(isOwned?'ff':'aa');
-    ctx.fillText(emoji,cx,cy);
+    ctx.fillText(emoji,ecx,ecy);
     ctx.fillStyle=color;
     ctx.font=`bold ${Math.max(7,ppc*2.2)}px sans-serif`;
-    ctx.fillText(label,cx,cy+rpx+ppc*2.5);
+    ctx.fillText(label,ecx,cy+spx+ppc*2.5);
   }
 }
 
@@ -1036,8 +1040,8 @@ canvas.addEventListener('mousemove',e=>{
   if(drag.type){
     isDragging=true;
     const obj=drag.type==='helipad'?alliances[drag.idx].helipad:cities[drag.idx];
-    obj.x=clamp(snapDrag(raw.x-drag.offX),obj.r,MAP_W-obj.r);
-    obj.y=clamp(snapDrag(raw.y-drag.offY),obj.r,MAP_H-obj.r);
+    obj.x=clamp(snapDrag(raw.x-drag.offX),0,MAP_W-obj.r);
+    obj.y=clamp(snapDrag(raw.y-drag.offY),obj.r,MAP_H);
     renderCfgTab(); renderCityList(); ghost=null;
   } else {
     const hit=hitTest(raw.x,raw.y);
