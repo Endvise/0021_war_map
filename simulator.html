@@ -309,7 +309,7 @@ tr:hover td{background:rgba(34,211,238,.025)}
     <div class="tab-body show" id="tabTpl">
       <div class="sec">맵 크기</div>
       <div class="duo">
-        <div class="row"><label>너비</label><input id="tMapW" type="number" value="404"></div>
+        <div class="row"><label>너비</label><input id="tMapW" type="number" value="398"></div>
         <div class="row"><label>높이</label><input id="tMapH" type="number" value="398"></div>
       </div>
 
@@ -488,25 +488,25 @@ function setSnap(s) {
   });
 }
 const AL_COLORS = ['#64b5f6','#ef5350','#66bb6a','#ffd54f','#ce93d8','#ff8a65','#80deea','#f48fb1'];
-let MAP_W = 404, MAP_H = 398, ppc = 3;
+let MAP_W = 398, MAP_H = 404, ppc = 3;
 const MIN_PPC = 1, MAX_PPC = 16;
 
 // ── 연맹 상태 ─────────────────────────────────────────
 function makeAlliance(id, name, color, hx, hy) {
   return { id, name, color, towers:[],
-    helipad:{x:hx, y:hy, r:25},
+    helipad:{x:hx, y:hy, r:7.5},
     cement:100, towerCount:20, cities6:0, cities7:0, cities8:0,
     prismCoins:0, coinChaseUsed:0, coinChaseLastUTC:null };
 }
 let alliances = [
-  makeAlliance(0,'A 연맹', AL_COLORS[0],  45,  370),  // SW
-  makeAlliance(1,'B 연맹', AL_COLORS[1], 202,  370),  // S
-  makeAlliance(2,'C 연맹', AL_COLORS[2], 360,  370),  // SE
-  makeAlliance(3,'D 연맹', AL_COLORS[3], 360,  199),  // E
-  makeAlliance(4,'E 연맹', AL_COLORS[4], 360,   25),  // NE
-  makeAlliance(5,'F 연맹', AL_COLORS[5], 202,   25),  // N
-  makeAlliance(6,'G 연맹', AL_COLORS[6],  45,   25),  // NW
-  makeAlliance(7,'H 연맹', AL_COLORS[7],  45,  199),  // W
+  makeAlliance(0,'A 연맹', AL_COLORS[0],  91.5, 363.5),
+  makeAlliance(1,'B 연맹', AL_COLORS[1], 226.5, 357.5),
+  makeAlliance(2,'C 연맹', AL_COLORS[2], 370.5, 318.5),
+  makeAlliance(3,'D 연맹', AL_COLORS[3], 376.5, 186.5),
+  makeAlliance(4,'E 연맹', AL_COLORS[4], 358.5,  81.5),
+  makeAlliance(5,'F 연맹', AL_COLORS[5], 226.5,  78.5),
+  makeAlliance(6,'G 연맹', AL_COLORS[6],  97.5,  78.5),
+  makeAlliance(7,'H 연맹', AL_COLORS[7],  76.5, 249.5),
 ];
 let alIdSeq   = 8;
 let activeIdx = 0;
@@ -551,24 +551,25 @@ function getRanking() {
 }
 
 // ── 도시 상태 ─────────────────────────────────────────
-// 맵 404×398 기준: 헬기장 A(45,370)~H(45,199) 배치에 맞춰 도시 배치
+// 맵 398×404 (x:0~398, y:0~404), 좌하단=원점, 영토 15×15 (r=7.5)
+// 입력 좌표 = 영토 좌상단 → 중심 = (x+7.5, y-7.5)
 let cities = [
-  // 6도시 8개 — 각 연맹 헬기장 인근 (헬기장~중앙 35% 지점)
-  { id:0,  level:6, label:'6도시-A', color:'#aed581', x:100, y:310, r:20, owner:null },
-  { id:1,  level:6, label:'6도시-B', color:'#aed581', x:202, y:310, r:20, owner:null },
-  { id:2,  level:6, label:'6도시-C', color:'#aed581', x:305, y:310, r:20, owner:null },
-  { id:3,  level:6, label:'6도시-D', color:'#aed581', x:305, y:199, r:20, owner:null },
-  { id:4,  level:6, label:'6도시-E', color:'#aed581', x:305, y: 90, r:20, owner:null },
-  { id:5,  level:6, label:'6도시-F', color:'#aed581', x:202, y: 90, r:20, owner:null },
-  { id:6,  level:6, label:'6도시-G', color:'#aed581', x:100, y: 90, r:20, owner:null },
-  { id:7,  level:6, label:'6도시-H', color:'#aed581', x:100, y:199, r:20, owner:null },
-  // 7도시 4개 — 중앙 거점 내측 4방향
-  { id:8,  level:7, label:'7도시-1', color:'#ffd54f', x:145, y:255, r:25, owner:null, prism:450 },
-  { id:9,  level:7, label:'7도시-2', color:'#ffd54f', x:260, y:255, r:25, owner:null, prism:450 },
-  { id:10, level:7, label:'7도시-3', color:'#ffd54f', x:145, y:145, r:25, owner:null, prism:450 },
-  { id:11, level:7, label:'7도시-4', color:'#ffd54f', x:260, y:145, r:25, owner:null, prism:450 },
-  // 8도시 1개 — 맵 정중앙
-  { id:12, level:8, label:'8도시',   color:'#ff8a65', x:202, y:199, r:30, owner:null }
+  // 6도시 8개
+  { id:0,  level:6, label:'6도시-1', color:'#aed581', x:115.5, y:330.5, r:7.5, owner:null },
+  { id:1,  level:6, label:'6도시-2', color:'#aed581', x:217.5, y:324.5, r:7.5, owner:null },
+  { id:2,  level:6, label:'6도시-3', color:'#aed581', x:337.5, y:330.5, r:7.5, owner:null },
+  { id:3,  level:6, label:'6도시-4', color:'#aed581', x:361.5, y:219.5, r:7.5, owner:null },
+  { id:4,  level:6, label:'6도시-5', color:'#aed581', x:334.5, y:114.5, r:7.5, owner:null },
+  { id:5,  level:6, label:'6도시-6', color:'#aed581', x:226.5, y:111.5, r:7.5, owner:null },
+  { id:6,  level:6, label:'6도시-7', color:'#aed581', x:118.5, y:111.5, r:7.5, owner:null },
+  { id:7,  level:6, label:'6도시-8', color:'#aed581', x: 97.5, y:216.5, r:7.5, owner:null },
+  // 7도시 4개
+  { id:8,  level:7, label:'7도시-1', color:'#ffd54f', x:166.5, y:264.5, r:7.5, owner:null, prism:450 },
+  { id:9,  level:7, label:'7도시-2', color:'#ffd54f', x:286.5, y:264.5, r:7.5, owner:null, prism:450 },
+  { id:10, level:7, label:'7도시-3', color:'#ffd54f', x:286.5, y:180.5, r:7.5, owner:null, prism:450 },
+  { id:11, level:7, label:'7도시-4', color:'#ffd54f', x:166.5, y:180.5, r:7.5, owner:null, prism:450 },
+  // 8도시 1개 — 7도시 4개의 중심
+  { id:12, level:8, label:'8도시',   color:'#ff8a65', x:226.5, y:222.5, r:7.5, owner:null }
 ];
 let cityIdSeq = 13;
 
@@ -886,7 +887,7 @@ function loadLS(){
     const raw=localStorage.getItem('war_map_v1');
     if(!raw) return;
     const d=JSON.parse(raw);
-    MAP_W=d.mapW||404; MAP_H=d.mapH||398;
+    MAP_W=d.mapW||398; MAP_H=d.mapH||404;
     document.getElementById('tMapW').value=MAP_W;
     document.getElementById('tMapH').value=MAP_H;
     if(d.buildMin) document.getElementById('tBuildMin').value=d.buildMin;
@@ -1232,7 +1233,7 @@ function loadTemplate(e){
   reader.onload=ev=>{
     try{
       const d=JSON.parse(ev.target.result);
-      MAP_W=d.mapW||404; MAP_H=d.mapH||398;
+      MAP_W=d.mapW||398; MAP_H=d.mapH||404;
       document.getElementById('tMapW').value=MAP_W;
       document.getElementById('tMapH').value=MAP_H;
       if(d.tower){document.getElementById('tBuildMin').value=d.tower.buildMin;document.getElementById('tBurnMin').value=d.tower.burnMin;document.getElementById('tBaseCost').value=d.tower.baseCost;document.getElementById('tCostInc').value=d.tower.costInc;}
