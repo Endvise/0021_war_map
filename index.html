@@ -680,7 +680,9 @@ const CITY_SCORES = { 6: 100000, 7: 300000, 8: 600000 };
 function calcScore(alIdx) {
   const al = alliances[alIdx];
   const cityScore = cities.reduce((s, c) => s + (c.owner === alIdx ? CITY_SCORES[c.level] : 0), 0);
-  const prism = (al.prismCoins || 0) * 1000;
+  // 소유 7도시 코인(k단위) + 연맹 직접 코인(k단위)
+  const cityCoins = cities.reduce((s, c) => s + (c.owner === alIdx && c.level === 7 ? (c.coins || 0) : 0), 0);
+  const prism = (cityCoins + (al.prismCoins || 0)) * 1000;
   return { cityScore, prism, total: cityScore + prism };
 }
 
@@ -704,10 +706,10 @@ let cities = [
   { id:6,  level:6, label:'6도시-7', color:'#aed581', x:111, y:119, r:15, owner:null },
   { id:7,  level:6, label:'6도시-8', color:'#aed581', x: 90, y:224, r:15, owner:null },
   // 7도시 4개
-  { id:8,  level:7, label:'7도시-1', color:'#ffd54f', x:159, y:272, r:15, owner:null, prism:450 },
-  { id:9,  level:7, label:'7도시-2', color:'#ffd54f', x:279, y:272, r:15, owner:null, prism:450 },
-  { id:10, level:7, label:'7도시-3', color:'#ffd54f', x:279, y:188, r:15, owner:null, prism:450 },
-  { id:11, level:7, label:'7도시-4', color:'#ffd54f', x:159, y:188, r:15, owner:null, prism:450 },
+  { id:8,  level:7, label:'7도시-1', color:'#ffd54f', x:159, y:272, r:15, owner:null, coins:0, conqueredAt:null },
+  { id:9,  level:7, label:'7도시-2', color:'#ffd54f', x:279, y:272, r:15, owner:null, coins:0, conqueredAt:null },
+  { id:10, level:7, label:'7도시-3', color:'#ffd54f', x:279, y:188, r:15, owner:null, coins:0, conqueredAt:null },
+  { id:11, level:7, label:'7도시-4', color:'#ffd54f', x:159, y:188, r:15, owner:null, coins:0, conqueredAt:null },
   // 8도시 1개 — 7도시 중심
   { id:12, level:8, label:'8도시',   color:'#ff8a65', x:219, y:231, r:15, owner:null }
 ];
@@ -1401,7 +1403,7 @@ function showCityOwnerMenu(cityIdx, px, py){
   const candidates=alliances.filter(al=>al.towers.some(t=>isTowerConnToCity(t,c)));
   (candidates.length?candidates:alliances).forEach(al=>{
     const mark=c.owner===al.id?' ✓':'';
-    makeBtn(al.name+mark, al.color, ()=>{ c.owner=al.id; checkAndApplyQuests(al); renderCfgTab(); });
+    makeBtn(al.name+mark, al.color, ()=>{ c.owner=al.id; c.conqueredAt=Date.now(); checkAndApplyQuests(al); renderCfgTab(); });
   });
   document.body.appendChild(menu);
   const close=ev=>{ if(!menu.contains(ev.target)){menu.remove();document.removeEventListener('mousedown',close);} };
@@ -1827,20 +1829,27 @@ function renderEvtTab(){
       </div>`;
 
     // 코인추격 현황
-    coinHtml='<div style="font-size:.68rem;color:#666;margin-bottom:6px">각 연맹의 코인추격 사용 현황 (토요일만 활성)</div>';
+    coinHtml=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+      <span style="font-size:.68rem;color:#666">코인추격 현황 (토요일만 활성)</span>
+      <button class="btn" style="padding:2px 7px;font-size:.63rem;background:#1a2a1a;color:#ffd54f;border:1px solid #665500"
+        onclick="generateSatCoins()" data-tip="토요일 UTC 00:00 — 각 7도시에 450k 코인 생성">💎 토요일 코인 생성</button>
+    </div>`;
     coinHtml+=alliances.map((al,i)=>{
       const used = al.coinChaseUsed||0;
       const lastUse = al.coinChaseLastUTC ? new Date(al.coinChaseLastUTC) : null;
       const coolEnd = lastUse ? new Date(lastUse.getTime()+12*3600000) : null;
       const onCooldown = coolEnd && now<coolEnd;
       const remainMin = onCooldown ? Math.ceil((coolEnd-now)/60000) : 0;
+      const owned7=cities.filter(c=>c.owner===i&&c.level===7);
+      const lastCity=owned7.length>0?owned7.reduce((a,b)=>(a.conqueredAt||0)>(b.conqueredAt||0)?a:b):null;
+      const destLabel=lastCity?`→ ${lastCity.label}`:'→ 연맹 직접';
+      const directCoins=al.prismCoins||0;
       return `<div style="background:#0d1825;border-left:3px solid ${al.color};border-radius:4px;padding:6px 8px;margin-bottom:5px">
         <div style="display:flex;justify-content:space-between;align-items:center">
           <span style="font-size:.73rem;color:${al.color};font-weight:700">${al.name}</span>
-          <span style="font-size:.7rem;color:${used>=2?'#ef5350':used===1?'#ffd54f':'#81c784'}">
-            ${used}/2회 사용
-          </span>
+          <span style="font-size:.7rem;color:${used>=2?'#ef5350':used===1?'#ffd54f':'#81c784'}">${used}/2회 사용</span>
         </div>
+        <div style="font-size:.63rem;color:#888;margin-top:2px">코인 적립처: <span style="color:#ffd54f">${destLabel}</span>${directCoins>0?` | 직접보유 ${directCoins*1000/10000}만k`:''}</div>
         ${onCooldown?`<div style="font-size:.65rem;color:#ff9800;margin-top:2px">⏳ 쿨타임 ${Math.floor(remainMin/60)}시간 ${remainMin%60}분 남음</div>`:''}
         ${used<2&&!onCooldown&&day===2&&coinAvail?`<div style="font-size:.65rem;color:#81c784;margin-top:2px">✅ 사용 가능</div>`:''}
         <div style="display:flex;gap:4px;margin-top:5px">
@@ -1868,10 +1877,25 @@ function useCoinChase(idx){
   }
   al.coinChaseUsed=(al.coinChaseUsed||0)+1;
   al.coinChaseLastUTC=now.toISOString();
-  al.prismCoins=(al.prismCoins||0)+90;
+  const owned7=cities.filter(c=>c.owner===idx&&c.level===7);
+  if(owned7.length>0){
+    // 마지막 점령 7도시에 90k 적립
+    const lastCity=owned7.reduce((a,b)=>(a.conqueredAt||0)>(b.conqueredAt||0)?a:b);
+    lastCity.coins=(lastCity.coins||0)+90;
+  } else {
+    // 7도시 미보유 → 연맹 직접 귀속
+    al.prismCoins=(al.prismCoins||0)+90;
+  }
   renderEvtTab(); renderOcpTab();
 }
 function resetCoinChase(idx){ alliances[idx].coinChaseUsed=0; alliances[idx].coinChaseLastUTC=null; renderEvtTab(); }
+
+function generateSatCoins(){
+  // 토요일 UTC 00:00 — 각 7도시에 450k(=450 k단위) 적립
+  cities.forEach(c=>{ if(c.level===7) c.coins=(c.coins||0)+450; });
+  renderEvtTab(); renderOcpTab();
+  alert('각 7도시에 450k 프리즘 코인이 생성되었습니다.');
+}
 
 // ── 전소 계산 탭 ─────────────────────────────────────
 function addBurnTower(){
@@ -1958,16 +1982,26 @@ function renderOcpTab(){
     if(sel) sel.value = c.owner==null ? -1 : c.owner;
   });
 
-  // 프리즘코인 입력
-  document.getElementById('ocpPrismList').innerHTML = alliances.map((al,i)=>`
-    <div class="row" style="display:flex;align-items:center;gap:5px;margin-bottom:4px">
-      <span class="al-dot" style="background:${al.color};width:8px;height:8px;border-radius:50%;flex-shrink:0"></span>
-      <span style="font-size:.73rem;flex:1">${al.name}</span>
-      <input type="number" value="${al.prismCoins||0}" min="0" step="90"
-        style="width:70px;padding:2px 5px;background:#0d1b2e;border:1px solid #334;border-radius:3px;color:#eee;font-size:.75rem"
-        oninput="alliances[${i}].prismCoins=+this.value;renderOcpTab()">
-      <span style="font-size:.65rem;color:#666">k</span>
-    </div>`).join('');
+  // 프리즘코인 표시 (7도시 코인 + 연맹 직접)
+  document.getElementById('ocpPrismList').innerHTML = alliances.map((al,i)=>{
+    const cityCoins=cities.filter(c=>c.owner===i&&c.level===7).map(c=>`<span style="color:#ffd54f">${c.label}</span>: ${c.coins||0}k`).join(' / ')||'없음';
+    const direct=al.prismCoins||0;
+    const totalK=cities.reduce((s,c)=>s+(c.owner===i&&c.level===7?(c.coins||0):0),0)+direct;
+    return `<div style="background:#0d1825;border-left:3px solid ${al.color};border-radius:4px;padding:5px 8px;margin-bottom:4px">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <span style="font-size:.73rem;color:${al.color};font-weight:700">${al.name}</span>
+        <span style="font-size:.72rem;color:#fff">합계 ${totalK}k</span>
+      </div>
+      <div style="font-size:.62rem;color:#888;margin-top:2px">7도시: ${cityCoins}</div>
+      <div style="display:flex;align-items:center;gap:4px;margin-top:3px">
+        <span style="font-size:.62rem;color:#888">연맹직접:</span>
+        <input type="number" value="${direct}" min="0" step="90"
+          style="width:60px;padding:2px 4px;background:#0d1b2e;border:1px solid #334;border-radius:3px;color:#eee;font-size:.72rem"
+          oninput="alliances[${i}].prismCoins=+this.value;renderOcpTab()">
+        <span style="font-size:.62rem;color:#666">k</span>
+      </div>
+    </div>`;
+  }).join('');
 
   // 랭킹
   const ranking = getRanking();
