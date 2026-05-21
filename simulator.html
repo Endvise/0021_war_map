@@ -376,12 +376,26 @@ function getRanking() {
 }
 
 // ── 도시 상태 ─────────────────────────────────────────
+// 맵 404×398 기준: 헬기장 A(45,370)~H(45,199) 배치에 맞춰 도시 배치
 let cities = [
-  { id:0, level:6, label:'6도시', color:'#aed581', x:100, y:100, r:20, owner:null },
-  { id:1, level:7, label:'7도시', color:'#ffd54f', x:200, y:200, r:25, owner:null, prism:450 },
-  { id:2, level:8, label:'8도시', color:'#ff8a65', x:300, y:300, r:30, owner:null }
+  // 6도시 8개 — 각 연맹 헬기장 인근 (헬기장~중앙 35% 지점)
+  { id:0,  level:6, label:'6도시-A', color:'#aed581', x:100, y:310, r:20, owner:null },
+  { id:1,  level:6, label:'6도시-B', color:'#aed581', x:202, y:310, r:20, owner:null },
+  { id:2,  level:6, label:'6도시-C', color:'#aed581', x:305, y:310, r:20, owner:null },
+  { id:3,  level:6, label:'6도시-D', color:'#aed581', x:305, y:199, r:20, owner:null },
+  { id:4,  level:6, label:'6도시-E', color:'#aed581', x:305, y: 90, r:20, owner:null },
+  { id:5,  level:6, label:'6도시-F', color:'#aed581', x:202, y: 90, r:20, owner:null },
+  { id:6,  level:6, label:'6도시-G', color:'#aed581', x:100, y: 90, r:20, owner:null },
+  { id:7,  level:6, label:'6도시-H', color:'#aed581', x:100, y:199, r:20, owner:null },
+  // 7도시 4개 — 중앙 거점 내측 4방향
+  { id:8,  level:7, label:'7도시-1', color:'#ffd54f', x:145, y:255, r:25, owner:null, prism:450 },
+  { id:9,  level:7, label:'7도시-2', color:'#ffd54f', x:260, y:255, r:25, owner:null, prism:450 },
+  { id:10, level:7, label:'7도시-3', color:'#ffd54f', x:145, y:145, r:25, owner:null, prism:450 },
+  { id:11, level:7, label:'7도시-4', color:'#ffd54f', x:260, y:145, r:25, owner:null, prism:450 },
+  // 8도시 1개 — 맵 정중앙
+  { id:12, level:8, label:'8도시',   color:'#ff8a65', x:202, y:199, r:30, owner:null }
 ];
-let cityIdSeq = 3;
+let cityIdSeq = 13;
 
 // ── 캔버스 ────────────────────────────────────────────
 const canvas  = document.getElementById('map');
