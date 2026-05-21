@@ -840,6 +840,18 @@ const isConn = (a,b) => {
   const dx=Math.abs(b.x-a.x), dy=Math.abs(b.y-a.y);
   return (dx<TS && Math.max(0,dy-TS)<=GAP) || (dy<TS && Math.max(0,dx-TS)<=GAP);
 };
+// 경로 방향벡터 기반 최대 연결 스텝 계산 — isConn 조건 역산
+function getMaxStep(dx,dy){
+  const dist=Math.sqrt(dx*dx+dy*dy);
+  if(dist<0.001) return TS+GAP;
+  const dxU=Math.abs(dx)/dist, dyU=Math.abs(dy)/dist;
+  const INF=1e9;
+  // cond1: dxU*s < TS AND dyU*s <= TS+GAP
+  const c1=Math.min(dxU>0.001?(TS-0.001)/dxU:INF, dyU>0.001?(TS+GAP)/dyU:INF);
+  // cond2: dyU*s < TS AND dxU*s <= TS+GAP
+  const c2=Math.min(dyU>0.001?(TS-0.001)/dyU:INF, dxU>0.001?(TS+GAP)/dxU:INF);
+  return Math.max(c1,c2);
+}
 // 타워 ↔ 헬기장 연결
 // r=15 → center 소수점(X.5) + 정수 타워center = 반정수 dx → Math.round로 서브픽셀 오인 방지
 function isConnToHelipad(t,h){
@@ -1833,7 +1845,7 @@ function loadTemplate(e){
 // cem: k 단위, buildMin: 분, startTowerCount: 현재 보유 탑 수
 // 도시 연결은 자동 감지 → 생산량 동적 증가
 function calcPath(sx,sy,tx,ty,cem,buildMin,startTowerCount,alIdx=null){
-  const d=Math.sqrt((tx-sx)**2+(ty-sy)**2), n=Math.ceil(d/(TS+GAP));
+  const d=Math.sqrt((tx-sx)**2+(ty-sy)**2), n=Math.ceil(d/getMaxStep(tx-sx,ty-sy));
   const towers=[]; let c=cem*1000, total=0;
   const conn=new Set(); // 연결된 도시 인덱스
   // 헬기장은 처음부터 연결 (sx,sy = 헬기장 위치)
@@ -2313,7 +2325,7 @@ function calcRouteAt(rawX, rawY){
 
   const tx=dest.x+dest.r/2, ty=dest.y-dest.r/2;
   const dist=Math.sqrt((tx-sx)**2+(ty-sy)**2);
-  const n=Math.ceil(dist/(TS+GAP));
+  const n=Math.ceil(dist/getMaxStep(tx-sx,ty-sy));
 
   const waypointCities=[];
   cities.forEach((c,ci)=>{
@@ -2415,7 +2427,7 @@ function calcWaypointRoute(){
   waypoints.forEach((wp,wpi)=>{
     const tx=wp.x, ty=wp.y;
     const dist=Math.sqrt((tx-curX)**2+(ty-curY)**2);
-    const n=Math.ceil(dist/(TS+GAP));
+    const n=Math.ceil(dist/getMaxStep(tx-curX,ty-curY));
     const steps=[];
     for(let i=0;i<n;i++){
       const frac=(i+1)/n;
