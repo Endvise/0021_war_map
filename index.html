@@ -5,12 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>⚔ WAR MAP — IR 시뮬레이터</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Space+Mono:wght@400;700&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
 /* ===== WAR MAP — Geist / oklch tactical design system ===== */
 :root{
-  --font-ui:"Geist","Noto Sans KR",ui-sans-serif,system-ui,sans-serif;
-  --font-mono:"Geist Mono","JetBrains Mono",ui-monospace,monospace;
+  --font-ui:"Space Grotesk","Noto Sans KR",ui-sans-serif,system-ui,sans-serif;
+  --font-mono:"Space Mono","JetBrains Mono",ui-monospace,monospace;
   --r-sm:4px;--r-md:6px;--r-pill:999px;--dur:.14s;
   /* oklch tactical palette */
   --bg0:oklch(0.09 0.010 250);--bg1:oklch(0.12 0.012 250);
@@ -84,8 +84,15 @@ button{font:inherit;color:inherit;cursor:pointer}
 }
 .btn:hover{background:var(--bg3);border-color:var(--fg4);color:var(--fg)}
 .btn:active{transform:scale(.97)}
-.btn-calc{background:oklch(0.82 0.15 195/.12);color:var(--cyan);border-color:oklch(0.82 0.15 195/.35)}
-.btn-calc:hover{background:oklch(0.82 0.15 195/.22);border-color:var(--cyan)}
+.btn-calc{
+  background:var(--accent);color:var(--accent-ink);border-color:transparent;
+  font-weight:700;letter-spacing:.5px;
+  box-shadow:0 0 12px oklch(0.78 0.165 65/.4),0 2px 8px rgba(0,0,0,.4);
+}
+.btn-calc:hover{
+  filter:brightness(1.08);
+  box-shadow:0 0 20px oklch(0.78 0.165 65/.6),0 2px 12px rgba(0,0,0,.5);
+}
 .btn-reset{background:var(--bg1);color:var(--fg4);border-color:var(--line-soft)}
 .btn-reset:hover{color:var(--bad);border-color:oklch(0.68 0.20 25/.5);background:oklch(0.68 0.20 25/.08)}
 .btn-add{background:oklch(0.78 0.14 155/.08);color:var(--good);border-color:oklch(0.78 0.14 155/.25);font-size:.68rem}
@@ -97,8 +104,9 @@ button{font:inherit;color:inherit;cursor:pointer}
 /* ── TOOL GROUP (모드 버튼) ── */
 .tool-group{
   display:flex;align-items:stretch;
-  background:var(--bg2);border:1px solid var(--line-soft);
+  background:var(--bg0);border:1px solid var(--line);
   border-radius:var(--r-md);padding:2px;gap:1px;
+  box-shadow:inset 0 1px 3px rgba(0,0,0,.5);
 }
 .tool{
   appearance:none;border:0;background:transparent;
@@ -159,12 +167,14 @@ canvas#map{display:block;image-rendering:pixelated}
   background:var(--bg1);padding:5px 5px 0;gap:2px;overflow-x:auto;
 }
 .tab{
-  flex:1;padding:7px 3px 8px;text-align:center;font-size:.8rem;
+  flex:1;padding:6px 3px 7px;text-align:center;font-size:.82rem;
   cursor:pointer;color:var(--fg4);background:none;border:none;
   border-bottom:2px solid transparent;transition:all .15s;border-radius:5px 5px 0 0;
+  display:flex;flex-direction:column;align-items:center;gap:1px;
 }
 .tab:hover{color:var(--fg2)}
 .tab.active{color:var(--fg);background:var(--bg2);border-bottom-color:var(--accent)}
+.tab-lbl{font-size:.6rem;display:block;margin-top:1px;font-family:var(--font-ui);letter-spacing:.3px}
 .tab-body{
   flex:1;overflow-y:auto;padding:10px 10px 24px;display:none;
   scrollbar-width:thin;scrollbar-color:var(--line-soft) transparent;
@@ -175,18 +185,19 @@ canvas#map{display:block;image-rendering:pixelated}
 ::-webkit-scrollbar-thumb{background:var(--line);border-radius:2px}
 /* ── SECTION HEADERS ── */
 .sec{
-  font-size:.65rem;font-weight:700;color:var(--accent);
-  text-transform:uppercase;margin:10px 0 6px;letter-spacing:1.5px;
-  border-bottom:1px solid oklch(0.78 0.165 65/.15);padding-bottom:4px;
+  font-size:.68rem;font-weight:700;color:var(--accent);
+  text-transform:uppercase;margin:12px 0 7px;letter-spacing:1.5px;
+  border-bottom:1px solid oklch(0.78 0.165 65/.2);padding-bottom:5px;
   display:flex;align-items:center;justify-content:space-between;
   font-family:var(--font-ui);
+  text-shadow:0 0 8px oklch(0.78 0.165 65/.4);
 }
 .sec:first-child{margin-top:0}
 .sec::before{
-  content:'';display:inline-block;width:3px;height:11px;
-  background:linear-gradient(180deg,var(--accent),oklch(0.78 0.165 65/.2));
-  border-radius:1px;box-shadow:0 0 6px var(--accent);
-  margin-right:5px;flex-shrink:0;
+  content:'';display:inline-block;width:3px;height:13px;
+  background:linear-gradient(180deg,var(--accent),oklch(0.78 0.165 65/.15));
+  border-radius:2px;box-shadow:0 0 8px var(--accent),0 0 16px oklch(0.78 0.165 65/.3);
+  margin-right:6px;flex-shrink:0;
 }
 /* ── FORM ── */
 .row{margin-bottom:5px}
@@ -249,12 +260,13 @@ select{
 .city-name-input:focus{outline:none;border-bottom-color:var(--cyan)}
 /* ── RESULT CARDS ── */
 .card{
-  background:var(--bg2);border-radius:var(--r-md);padding:9px 10px;margin-bottom:5px;
-  border:1px solid var(--line-soft);position:relative;overflow:hidden;
+  background:var(--bg2);border-radius:var(--r-md);padding:10px 12px;margin-bottom:6px;
+  border:1px solid var(--line);position:relative;overflow:hidden;
+  box-shadow:0 2px 8px rgba(0,0,0,.3);
 }
 .card::before{
   content:'';position:absolute;top:0;left:0;right:0;height:1px;
-  background:linear-gradient(90deg,transparent,oklch(0.82 0.15 195/.12),transparent);
+  background:linear-gradient(90deg,transparent,oklch(0.82 0.15 195/.25),transparent);
 }
 .card-row{display:flex;justify-content:space-between;font-size:.74rem;margin:3px 0;gap:4px}
 .badge{
@@ -452,13 +464,13 @@ tr:hover td{background:oklch(0.82 0.15 195/.025)}
   <div class="map-wrap" id="mapWrap"><canvas id="map"></canvas></div>
   <div class="side">
     <div class="side-tabs">
-      <button class="tab active" onclick="showTab('tpl',this)" data-tip="맵 설정 / 타워 규칙 / 목표 좌표">🗺</button>
-      <button class="tab"        onclick="showTab('cfg',this)" data-tip="연맹별 시멘트·타워수 설정">⚙</button>
-      <button class="tab"        onclick="showTab('rel',this)" data-tip="연맹 간 동맹·적대 관계 설정">🤝</button>
-      <button class="tab"        onclick="showTab('ocp',this)" data-tip="도시 점령 현황 및 랭킹">🏙</button>
-      <button class="tab"        onclick="showTab('evt',this)" data-tip="이벤트 일정 / UTC 시간 / 코인추격">⏰</button>
-      <button class="tab"        onclick="showTab('brn',this)" data-tip="타워 전소 시간 계산">🔥</button>
-      <button class="tab"        onclick="showTab('res',this)" data-tip="경로 계산 결과 / 충돌 예측">📊</button>
+      <button class="tab active" onclick="showTab('tpl',this)" data-tip="맵 설정 / 타워 규칙 / 목표 좌표">🗺<span class="tab-lbl">맵</span></button>
+      <button class="tab"        onclick="showTab('cfg',this)" data-tip="연맹별 시멘트·타워수 설정">⚙<span class="tab-lbl">연맹</span></button>
+      <button class="tab"        onclick="showTab('rel',this)" data-tip="연맹 간 동맹·적대 관계 설정">🤝<span class="tab-lbl">동맹</span></button>
+      <button class="tab"        onclick="showTab('ocp',this)" data-tip="도시 점령 현황 및 랭킹">🏙<span class="tab-lbl">도시</span></button>
+      <button class="tab"        onclick="showTab('evt',this)" data-tip="이벤트 일정 / UTC 시간 / 코인추격">⏰<span class="tab-lbl">시간</span></button>
+      <button class="tab"        onclick="showTab('brn',this)" data-tip="타워 전소 시간 계산">🔥<span class="tab-lbl">점화</span></button>
+      <button class="tab"        onclick="showTab('res',this)" data-tip="경로 계산 결과 / 충돌 예측">📊<span class="tab-lbl">결과</span></button>
     </div>
 
     <!-- 템플릿 탭 -->
