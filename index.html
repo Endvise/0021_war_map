@@ -659,7 +659,7 @@ function draw() {
   // 도시 (점령 연맹 색상 + 연결 여부 표시)
   cities.forEach((c,ci) => {
     const connAlliances = alliances.filter(al => {
-      const towers = al.towers.length>0 ? al.towers : [{x:al.helipad.x,y:al.helipad.y}];
+      const towers = al.towers.length>0 ? al.towers : [{x:al.helipad.x+al.helipad.r/2,y:al.helipad.y-al.helipad.r/2}];
       const s = new Set(); getConnectedCities(towers).forEach(id=>s.add(id));
       return s.has(ci);
     });
@@ -1290,8 +1290,8 @@ function runSim(){
   const tx=G('tgtX'),ty=G('tgtY'),bm=G('tBuildMin');
   const results=alliances.map(al=>{
     const res=al.towers.length>0
-      ?calcFromPlaced(al.towers,al.cement,bm,al.towerCount,al.helipad.x,al.helipad.y)
-      :calcPath(al.helipad.x,al.helipad.y,tx,ty,al.cement,bm,al.towerCount);
+      ?calcFromPlaced(al.towers,al.cement,bm,al.towerCount,al.helipad.x+al.helipad.r/2,al.helipad.y-al.helipad.r/2)
+      :calcPath(al.helipad.x+al.helipad.r/2,al.helipad.y-al.helipad.r/2,tx,ty,al.cement,bm,al.towerCount);
     return {al,res};
   });
   lastSimResults=results;
