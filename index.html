@@ -34,8 +34,15 @@ header{
   padding:0 10px;
   background:linear-gradient(180deg,#060c1c 0%,#040810 100%);
   border-bottom:1px solid var(--border);
-  display:flex;align-items:center;gap:6px;flex-shrink:0;flex-wrap:wrap;
-  min-height:42px;position:relative;
+  display:flex;flex-direction:column;flex-shrink:0;position:relative;
+}
+.hdr-row{
+  display:flex;align-items:center;gap:6px;flex-wrap:nowrap;
+  padding:4px 0;min-height:34px;
+}
+.hdr-row+.hdr-row{
+  border-top:1px solid var(--border);
+  padding:3px 0;min-height:30px;
 }
 header::after{
   content:'';position:absolute;bottom:0;left:0;right:0;height:1px;
@@ -238,7 +245,24 @@ td{padding:3px 2px;text-align:center;border-bottom:1px solid rgba(13,28,56,.6)}
 tr:hover td{background:rgba(34,211,238,.025)}
 .warn{color:#fbbf24}.ok{color:var(--green)}
 
-/* ── STATUS BAR ── */
+/* ── TOOLTIP ── */
+[data-tip]{position:relative}
+[data-tip]::after{
+  content:attr(data-tip);
+  position:absolute;top:calc(100% + 6px);left:50%;transform:translateX(-50%);
+  background:#0a1828;color:#c8daf0;font-size:.63rem;font-family:'JetBrains Mono',monospace;
+  padding:4px 9px;border-radius:3px;border:1px solid #1e3a5f;white-space:nowrap;
+  pointer-events:none;opacity:0;transition:opacity .15s;z-index:10000;
+  box-shadow:0 4px 12px rgba(0,0,0,.8);letter-spacing:.3px;
+}
+[data-tip]::before{
+  content:'';position:absolute;top:calc(100% + 1px);left:50%;transform:translateX(-50%);
+  border:4px solid transparent;border-bottom-color:#1e3a5f;
+  pointer-events:none;opacity:0;transition:opacity .15s;z-index:10001;
+}
+[data-tip]:hover::after,[data-tip]:hover::before{opacity:1}
+
+/* STATUS BAR ── */
 .posbar{
   font-size:.6rem;color:#4a6a8a;padding:2px 10px;
   background:var(--bg0);border-top:1px solid var(--border);
@@ -251,58 +275,80 @@ tr:hover td{background:rgba(34,211,238,.025)}
 <body>
 
 <header>
-  <h1>⚔️ SLG 시뮬레이터</h1>
-  <span class="sep">│</span>
-  <div id="allianceBtns"></div>
-  <span class="sep">│</span>
-  <div id="towerModeBtns" style="display:flex;gap:3px">
-    <button class="btn" id="tmBuild"  onclick="setTowerMode('build')"
-      style="background:#1565c0;color:#fff;border:1px solid #4fc3f7;padding:4px 8px">🔨 건설</button>
-    <button class="btn" id="tmDemol"  onclick="setTowerMode('demolish')"
-      style="background:#1a2a3a;color:#a8d8ff;border:1px solid #334;padding:4px 8px">🔧 철거</button>
-    <button class="btn" id="tmIgnite" onclick="setTowerMode('ignite')"
-      style="background:#1a2a3a;color:#ffae33;border:1px solid #334;padding:4px 8px">🔥 점화</button>
+  <!-- 1행: 연맹·타워모드·계산·스냅 -->
+  <div class="hdr-row">
+    <h1>⚔️ SLG 시뮬레이터</h1>
+    <span class="sep">│</span>
+    <div id="allianceBtns"></div>
+    <span class="sep">│</span>
+    <div id="towerModeBtns" style="display:flex;gap:3px">
+      <button class="btn" id="tmBuild"  onclick="setTowerMode('build')"
+        data-tip="캔버스 클릭으로 타워 건설"
+        style="background:#1565c0;color:#fff;border:1px solid #4fc3f7;padding:3px 8px">🔨 건설</button>
+      <button class="btn" id="tmDemol"  onclick="setTowerMode('demolish')"
+        data-tip="타워 클릭으로 철거"
+        style="background:#1a2a3a;color:#a8d8ff;border:1px solid #334;padding:3px 8px">🔧 철거</button>
+      <button class="btn" id="tmIgnite" onclick="setTowerMode('ignite')"
+        data-tip="타워 클릭으로 점화 — 내구도 초당 감소"
+        style="background:#1a2a3a;color:#ffae33;border:1px solid #334;padding:3px 8px">🔥 점화</button>
+    </div>
+    <button class="btn" onclick="undoTower()"
+      data-tip="마지막 타워 건설 취소"
+      style="background:#37474f;color:#d4dce6;border:1px solid #455a64;padding:3px 9px">↩ 취소</button>
+    <span class="sep">│</span>
+    <button class="btn btn-calc" onclick="runSim()"
+      data-tip="모든 연맹 경로·도달 시간 계산">▶ 계산</button>
+    <button class="btn btn-reset" onclick="resetTowers()"
+      data-tip="현재 연맹의 타워 전체 삭제">🗑 초기화</button>
+    <span class="sep">│</span>
+    <span style="font-size:.65rem;color:#5a7a9a">스냅:</span>
+    <div id="snapBtns" style="display:flex;gap:3px">
+      <button class="btn" id="snap1" onclick="setSnap(1)"
+        data-tip="1칸 단위 자유 배치"
+        style="padding:2px 7px;background:#1a2a3a;color:#a8d8ff;border:1px solid #334">1×1</button>
+      <button class="btn" id="snap2" onclick="setSnap(2)"
+        data-tip="2칸 단위 스냅"
+        style="padding:2px 7px;background:#1a2a3a;color:#a8d8ff;border:1px solid #334">2×2</button>
+      <button class="btn" id="snap3" onclick="setSnap(3)"
+        data-tip="3칸 단위 스냅 (기본값)"
+        style="padding:2px 7px;background:#1565c0;color:#fff;border:1px solid #4fc3f7">3×3</button>
+    </div>
   </div>
-  <button class="btn" onclick="undoTower()"
-    style="background:#37474f;color:#d4dce6;border:1px solid #455a64;padding:4px 9px">↩ 취소</button>
-  <span class="sep">│</span>
-  <span style="font-size:.68rem;color:#888">지형:</span>
-  <div id="terrainModeBtns" style="display:flex;gap:3px">
-    <button class="btn" id="tmRiver"    onclick="setTerrainMode('river')"
-      style="background:#1a2a3a;color:#a8d8ff;border:1px solid #334;padding:4px 8px">🌊 강</button>
-    <button class="btn" id="tmBridge"   onclick="setTerrainMode('bridge')"
-      style="background:#1a2a3a;color:#b09080;border:1px solid #334;padding:4px 8px">🌉 다리</button>
-    <button class="btn" id="tmMountain" onclick="setTerrainMode('mountain')"
-      style="background:#1a2a3a;color:#aec5d0;border:1px solid #334;padding:4px 8px">⛰ 산</button>
-    <button class="btn" id="tmTerrainOff" onclick="setTerrainMode(null)"
-      style="background:#455a64;color:#d4dce6;border:1px solid #546e7a;padding:4px 8px">OFF</button>
+  <!-- 2행: 지형 -->
+  <div class="hdr-row">
+    <span style="font-size:.65rem;color:#5a7a9a">지형:</span>
+    <div id="terrainModeBtns" style="display:flex;gap:3px">
+      <button class="btn" id="tmRiver"    onclick="setTerrainMode('river')"
+        data-tip="강 드래그 그리기 — 타워 배치 불가 구역"
+        style="background:#1a2a3a;color:#a8d8ff;border:1px solid #334;padding:2px 8px">🌊 강</button>
+      <button class="btn" id="tmBridge"   onclick="setTerrainMode('bridge')"
+        data-tip="다리 드래그 그리기 — 강 위 통로"
+        style="background:#1a2a3a;color:#b09080;border:1px solid #334;padding:2px 8px">🌉 다리</button>
+      <button class="btn" id="tmMountain" onclick="setTerrainMode('mountain')"
+        data-tip="산 드래그 그리기 — 타워 배치 불가 구역"
+        style="background:#1a2a3a;color:#aec5d0;border:1px solid #334;padding:2px 8px">⛰ 산</button>
+      <button class="btn" id="tmTerrainOff" onclick="setTerrainMode(null)"
+        data-tip="지형 그리기 모드 해제"
+        style="background:#455a64;color:#d4dce6;border:1px solid #546e7a;padding:2px 8px">OFF</button>
+    </div>
+    <button class="btn" onclick="undoTerrain()"
+      data-tip="마지막 지형 삭제"
+      style="background:#37474f;color:#d4dce6;border:1px solid #455a64;padding:2px 9px">↩ 지형</button>
+    <span class="hint" style="margin-left:auto">클릭:건설/철거/점화 | 휠클릭:맵이동 | 휠:줌 | 영토드래그:이동 | 도시우클릭:소유권</span>
   </div>
-  <button class="btn" onclick="undoTerrain()"
-    style="background:#37474f;color:#d4dce6;border:1px solid #455a64;padding:4px 9px">↩ 지형</button>
-  <span class="sep">│</span>
-  <button class="btn btn-calc"  onclick="runSim()">▶ 계산</button>
-  <button class="btn btn-reset" onclick="resetTowers()">🗑 초기화</button>
-  <span class="sep">│</span>
-  <span style="font-size:.68rem;color:#888">스냅:</span>
-  <div id="snapBtns" style="display:flex;gap:3px">
-    <button class="btn" id="snap1" onclick="setSnap(1)" style="padding:3px 7px;background:#1a2a3a;color:#a8d8ff;border:1px solid #334">1×1</button>
-    <button class="btn" id="snap2" onclick="setSnap(2)" style="padding:3px 7px;background:#1a2a3a;color:#a8d8ff;border:1px solid #334">2×2</button>
-    <button class="btn" id="snap3" onclick="setSnap(3)" style="padding:3px 7px;background:#1565c0;color:#fff;border:1px solid #4fc3f7">3×3</button>
-  </div>
-  <span class="hint">클릭:건설/철거/점화 | 휠:줌 | 영토드래그:이동</span>
 </header>
 
 <div class="main">
   <div class="map-wrap" id="mapWrap"><canvas id="map"></canvas></div>
   <div class="side">
     <div class="side-tabs">
-      <button class="tab active" onclick="showTab('tpl',this)">🗺</button>
-      <button class="tab"        onclick="showTab('cfg',this)">⚙</button>
-      <button class="tab"        onclick="showTab('rel',this)">🤝</button>
-      <button class="tab"        onclick="showTab('ocp',this)">🏙</button>
-      <button class="tab"        onclick="showTab('evt',this)">⏰</button>
-      <button class="tab"        onclick="showTab('brn',this)">🔥</button>
-      <button class="tab"        onclick="showTab('res',this)">📊</button>
+      <button class="tab active" onclick="showTab('tpl',this)" data-tip="맵 설정 / 타워 규칙 / 목표 좌표">🗺</button>
+      <button class="tab"        onclick="showTab('cfg',this)" data-tip="연맹별 시멘트·타워수 설정">⚙</button>
+      <button class="tab"        onclick="showTab('rel',this)" data-tip="연맹 간 동맹·적대 관계 설정">🤝</button>
+      <button class="tab"        onclick="showTab('ocp',this)" data-tip="도시 점령 현황 및 랭킹">🏙</button>
+      <button class="tab"        onclick="showTab('evt',this)" data-tip="이벤트 일정 / UTC 시간 / 코인추격">⏰</button>
+      <button class="tab"        onclick="showTab('brn',this)" data-tip="타워 전소 시간 계산">🔥</button>
+      <button class="tab"        onclick="showTab('res',this)" data-tip="경로 계산 결과 / 충돌 예측">📊</button>
     </div>
 
     <!-- 템플릿 탭 -->
