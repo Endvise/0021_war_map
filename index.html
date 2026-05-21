@@ -1014,19 +1014,26 @@ function drawBlocks(towers, color, connectedSet=null){
     const {cx,cy}=toC(t.x,t.y), s=TS*ppc, b3=3*ppc;
     const isLinked = connectedSet===null || connectedSet.has(i);
 
-    // 점화 상태 계산
+    // 상태별 HP 계산
     const isBurning=t.status==='burning';
+    const isRepairing=t.status==='repairing';
+    const maxHp=t.maxHp||TOWER_DEFAULTS.maxHp;
     const burnElapsed=isBurning?(Date.now()-(t.burnStart||0))/1000:0;
-    const hpLeft=isBurning?Math.max(0,(t.hp||TOWER_DEFAULTS.maxHp)-(t.burnRatePerSec||5)*burnElapsed):(t.hp||TOWER_DEFAULTS.maxHp);
-    const hpRatio=hpLeft/(t.maxHp||TOWER_DEFAULTS.maxHp);
+    const repairElapsed=isRepairing?(Date.now()-(t.repairStart||0))/1000:0;
+    let hpLeft;
+    if(isBurning) hpLeft=Math.max(0,(t.hp||maxHp)-(t.burnRatePerSec||5)*burnElapsed);
+    else if(isRepairing) hpLeft=Math.min(maxHp,(t.repairHp||0)+3*repairElapsed);
+    else hpLeft=t.hp||maxHp;
+    const hpRatio=hpLeft/maxHp;
     if(isBurning&&hpLeft<=0&&t.status!=='destroyed'){ t.status='destroyed'; }
 
     let blockColor, fillAlpha, strokeColor;
     if (!isLinked) {
-      // 소등(미연결) 상태 — 회색 dim
       blockColor='#444'; fillAlpha='66'; strokeColor='#666';
     } else if (isBurning) {
       blockColor='#ff6d00'; fillAlpha='bb'; strokeColor='#ff9800';
+    } else if (isRepairing) {
+      blockColor='#1b5e20'; fillAlpha='cc'; strokeColor='#66bb6a';
     } else if (t.status==='destroyed') {
       blockColor='#424242'; fillAlpha='cc'; strokeColor='#616161';
     } else {
@@ -1035,9 +1042,9 @@ function drawBlocks(towers, color, connectedSet=null){
     ctx.fillStyle=blockColor+fillAlpha; ctx.fillRect(cx-s/2,cy-s/2,s,s);
     ctx.strokeStyle=strokeColor;
     ctx.lineWidth=1.5; ctx.strokeRect(cx-s/2,cy-s/2,s,s);
-    if(isBurning){
+    if(isBurning||isRepairing){
       ctx.fillStyle='#333'; ctx.fillRect(cx-s/2,cy+s/2+1,s,ppc*1.5);
-      ctx.fillStyle=hpRatio>0.5?'#81c784':'#ff9800';
+      ctx.fillStyle=isRepairing?'#66bb6a':(hpRatio>0.5?'#81c784':'#ff9800');
       ctx.fillRect(cx-s/2,cy+s/2+1,s*hpRatio,ppc*1.5);
     }
     ctx.strokeStyle='#ffffff22'; ctx.lineWidth=.5;
@@ -1428,9 +1435,11 @@ function showTowerMenu(al, alIdx, tIdx, px, py){
     btn.onclick=()=>{ onClick(); menu.remove(); draw(); renderCfgTab(); };
     menu.appendChild(btn);
   };
-  if(t.status!=='burning'){
+  if(t.status==='built'||t.status==='repairing'){
     makeBtn(`🔥 점화`, '#e65100', ()=>{
       t.status='burning'; t.burnStart=Date.now();
+      t.hp=t.hp||t.maxHp||TOWER_DEFAULTS.maxHp;
+      t.repairStart=null; t.repairHp=null;
       t.burnRatePerSec=G('tBurnRate')||TOWER_DEFAULTS.burnRatePerSec;
       t.burnDurationSec=TOWER_DEFAULTS.burnDurationSec;
     });
@@ -2210,8 +2219,37 @@ renderCityList();
 resizeCanvas();
 draw();
 
+// 타워 상태 tick — 1초마다
+function tickTowers(){
+  const now=Date.now();
+  let changed=false;
+  alliances.forEach(al=>{
+    al.towers.forEach(t=>{
+      if(t.status==='burning'){
+        const elapsed=(now-(t.burnStart||0))/1000;
+        if(elapsed>=(t.burnDurationSec||900)){
+          // 15분 소진 → 수리 전환
+          t.hp=Math.max(0,(t.hp||t.maxHp||TOWER_DEFAULTS.maxHp)-(t.burnRatePerSec||5)*elapsed);
+          t.status='repairing'; t.repairStart=now; t.repairHp=t.hp;
+          changed=true;
+        }
+      } else if(t.status==='repairing'){
+        const elapsed=(now-(t.repairStart||0))/1000;
+        const maxHp=t.maxHp||TOWER_DEFAULTS.maxHp;
+        const cur=Math.min(maxHp,(t.repairHp||0)+3*elapsed);
+        if(cur>=maxHp){
+          t.hp=maxHp; t.status='built'; t.repairStart=null; t.repairHp=null;
+          changed=true;
+        }
+      }
+    });
+  });
+  if(changed) draw();
+}
+
 // UTC 실시간 클록
 setInterval(()=>{
+  tickTowers();
   const el = document.getElementById('utcClock');
   if(!el) return;
   const now = new Date();
