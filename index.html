@@ -1743,11 +1743,11 @@ function renderRelTab(){
       }).join('');
   document.getElementById('allyGroupInfo').innerHTML=allyGroupHtml;
 
-  // 진영 합산 점수
+  // 개별 점수 (동맹 합산 없음)
   const scores=alliances.map((_,i)=>{
     const alliedIdx=alliances.map((_,j)=>j).filter(j=>j!==i&&getRel(i,j)==='ally');
-    const total=[i,...alliedIdx].reduce((s,idx)=>s+calcScore(idx).total,0);
-    return {i,alliedIdx,total};
+    const s=calcScore(i);
+    return {i,alliedIdx,total:s.total};
   }).sort((a,b)=>b.total-a.total);
   document.getElementById('relTeamScore').innerHTML=scores.map((t,rank)=>{
     const medals=['🥇','🥈','🥉'];
