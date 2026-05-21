@@ -5,329 +5,299 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>⚔ WAR MAP — IR 시뮬레이터</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
-html{font-size:107%}
-
+/* ===== WAR MAP — Geist / oklch tactical design system ===== */
 :root{
-  --bg0:#02040b;--bg1:#050810;--bg2:#070c18;--bg3:#0a1020;
-  --border:#0d1c38;--border2:#162444;
-  --amber:#f59e0b;--amber-d:#78490a;
-  --cyan:#22d3ee;--cyan-d:#0e4a5a;
-  --green:#10b981;--red:#ef4444;
-  --txt:#b0bec5;--txt2:#e0e6ef;--txt3:#f0f4f8;
+  --font-ui:"Geist","Noto Sans KR",ui-sans-serif,system-ui,sans-serif;
+  --font-mono:"Geist Mono","JetBrains Mono",ui-monospace,monospace;
+  --r-sm:4px;--r-md:6px;--r-pill:999px;--dur:.14s;
+  /* oklch tactical palette */
+  --bg0:oklch(0.09 0.010 250);--bg1:oklch(0.12 0.012 250);
+  --bg2:oklch(0.15 0.014 250);--bg3:oklch(0.19 0.016 250);
+  --line:oklch(0.26 0.016 250);--line-soft:oklch(0.21 0.012 250);
+  --fg:oklch(0.95 0.005 250);--fg2:oklch(0.78 0.010 250);
+  --fg3:oklch(0.58 0.010 250);--fg4:oklch(0.40 0.010 250);
+  --accent:oklch(0.78 0.165 65);
+  --accent-ink:oklch(0.16 0.040 65);
+  --accent-soft:oklch(0.78 0.165 65 / .14);
+  --good:oklch(0.78 0.14 155);--warn:oklch(0.80 0.16 80);
+  --bad:oklch(0.68 0.20 25);
+  --cyan:oklch(0.82 0.15 195);--cyan-soft:oklch(0.82 0.15 195 / .14);
+  /* legacy aliases so existing inline-style vars still work */
+  --amber:oklch(0.78 0.165 65);--amber-d:oklch(0.35 0.08 65);
+  --cyan-d:oklch(0.35 0.08 195);--green:oklch(0.78 0.14 155);
+  --red:oklch(0.68 0.20 25);
+  --txt:var(--fg2);--txt2:var(--fg);--txt3:var(--fg);
+  --bg-0:var(--bg0);--bg-1:var(--bg1);--bg-2:var(--bg2);
+  --border:var(--line);--border2:var(--line-soft);
 }
 *{box-sizing:border-box;margin:0;padding:0}
-
+html{font-size:13px}
 body{
-  font-family:'Share Tech Mono',monospace;
-  background:var(--bg0);color:var(--txt);
+  font-family:var(--font-ui);background:var(--bg0);color:var(--fg2);
   display:flex;flex-direction:column;height:100vh;overflow:hidden;
+  -webkit-font-smoothing:antialiased;font-feature-settings:"ss01","cv11";
 }
-
-/* vignette overlay */
 body::before{
   content:'';position:fixed;inset:0;pointer-events:none;z-index:9997;
-  background:radial-gradient(ellipse at 50% 30%,transparent 45%,rgba(0,0,0,.6) 100%);
+  background:radial-gradient(ellipse at 50% 30%,transparent 45%,rgba(0,0,0,.5) 100%);
 }
-
-/* scanline texture */
 body::after{
   content:'';position:fixed;inset:0;pointer-events:none;z-index:9999;
-  background:repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,0,0,.07) 3px,rgba(0,0,0,.07) 4px);
+  background:repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,0,0,.05) 3px,rgba(0,0,0,.05) 4px);
 }
-
 /* ── HEADER ── */
 header{
-  padding:0 10px;
-  background:linear-gradient(180deg,#060c1c 0%,#040810 100%);
-  border-bottom:1px solid var(--border);
+  padding:0 10px;background:var(--bg1);border-bottom:1px solid var(--line);
   display:flex;flex-direction:column;flex-shrink:0;position:relative;
 }
 .hdr-row{
   display:flex;align-items:center;gap:6px;flex-wrap:nowrap;
-  padding:4px 0;min-height:34px;
+  padding:5px 0;min-height:36px;
 }
-.hdr-row+.hdr-row{
-  border-top:1px solid var(--border);
-  padding:3px 0;min-height:30px;
-}
-
-@keyframes headerGlow{
-  0%,100%{opacity:.5}
-  50%{opacity:1}
-}
+.hdr-row+.hdr-row{border-top:1px solid var(--line-soft);padding:4px 0;min-height:32px}
+@keyframes headerGlow{0%,100%{opacity:.4}50%{opacity:1}}
 header::after{
   content:'';position:absolute;bottom:0;left:0;right:0;height:1px;
-  background:linear-gradient(90deg,transparent 0%,#22d3ee33 30%,#f59e0b44 50%,#22d3ee33 70%,transparent 100%);
+  background:linear-gradient(90deg,transparent,oklch(0.82 0.15 195/.22) 30%,oklch(0.78 0.165 65/.3) 50%,oklch(0.82 0.15 195/.22) 70%,transparent);
   animation:headerGlow 3s ease-in-out infinite;
 }
-
-@keyframes blink{
-  0%,100%{opacity:1}
-  49%{opacity:1}
-  50%,99%{opacity:0}
-}
+@keyframes blink{0%,49%,100%{opacity:1}50%,99%{opacity:0}}
 header h1{
-  font-family:'Rajdhani',sans-serif;
-  color:var(--amber);font-size:1.05rem;font-weight:700;
-  letter-spacing:3px;text-transform:uppercase;white-space:nowrap;
-  text-shadow:0 0 24px rgba(245,158,11,.5),0 0 48px rgba(245,158,11,.2);
+  font-family:var(--font-ui);color:var(--accent);font-size:1rem;font-weight:700;
+  letter-spacing:2px;text-transform:uppercase;white-space:nowrap;
+  text-shadow:0 0 20px oklch(0.78 0.165 65/.5),0 0 40px oklch(0.78 0.165 65/.2);
 }
-
-/* corner decoration */
-header h1::before{content:'▸ ';color:var(--cyan);opacity:.7;}
-header h1::after{
-  content:'▮';animation:blink 1.4s step-end infinite;
-  font-size:.65rem;margin-left:4px;color:var(--cyan);
-}
-
-.sep{color:#1a2e50;font-size:.9rem;user-select:none}
-
+header h1::before{content:'▸ ';color:var(--cyan);opacity:.7}
+header h1::after{content:'▮';animation:blink 1.4s step-end infinite;font-size:.6rem;margin-left:4px;color:var(--cyan)}
+.sep{color:var(--line);font-size:.9rem;user-select:none}
 /* ── BUTTONS ── */
+button{font:inherit;color:inherit;cursor:pointer}
 .btn{
-  padding:3px 9px;border:1px solid var(--border2);border-radius:2px;
-  cursor:pointer;font-size:.73rem;font-weight:600;white-space:nowrap;
-  font-family:'Rajdhani',sans-serif;letter-spacing:.8px;text-transform:uppercase;
-  transition:all .15s;background:var(--bg2);color:#7a9abf;
-  position:relative;overflow:hidden;
+  padding:4px 10px;border:1px solid var(--line);border-radius:var(--r-md);
+  cursor:pointer;font-size:.75rem;font-weight:500;white-space:nowrap;
+  font-family:var(--font-ui);letter-spacing:.3px;
+  transition:background var(--dur),border-color var(--dur),color var(--dur);
+  background:var(--bg2);color:var(--fg2);
+  display:inline-flex;align-items:center;gap:5px;
 }
-.btn::after{
-  content:'';position:absolute;top:0;left:-100%;width:100%;height:100%;
-  background:linear-gradient(90deg,transparent,rgba(255,255,255,.05),transparent);
-  transition:left .3s;
+.btn:hover{background:var(--bg3);border-color:var(--fg4);color:var(--fg)}
+.btn:active{transform:scale(.97)}
+.btn-calc{background:oklch(0.82 0.15 195/.12);color:var(--cyan);border-color:oklch(0.82 0.15 195/.35)}
+.btn-calc:hover{background:oklch(0.82 0.15 195/.22);border-color:var(--cyan)}
+.btn-reset{background:var(--bg1);color:var(--fg4);border-color:var(--line-soft)}
+.btn-reset:hover{color:var(--bad);border-color:oklch(0.68 0.20 25/.5);background:oklch(0.68 0.20 25/.08)}
+.btn-add{background:oklch(0.78 0.14 155/.08);color:var(--good);border-color:oklch(0.78 0.14 155/.25);font-size:.68rem}
+.btn-add:hover{background:oklch(0.78 0.14 155/.18);border-color:var(--good);color:var(--fg)}
+.btn-save{background:oklch(0.82 0.15 195/.06);color:var(--cyan);border-color:oklch(0.82 0.15 195/.25)}
+.btn-save:hover{background:oklch(0.82 0.15 195/.18);border-color:var(--cyan)}
+.btn-load{background:oklch(0.65 0.18 295/.06);color:oklch(0.75 0.18 295);border-color:oklch(0.65 0.18 295/.25)}
+.btn-load:hover{background:oklch(0.65 0.18 295/.18);border-color:oklch(0.65 0.18 295);color:var(--fg)}
+/* ── TOOL GROUP (모드 버튼) ── */
+.tool-group{
+  display:flex;align-items:stretch;
+  background:var(--bg2);border:1px solid var(--line-soft);
+  border-radius:var(--r-md);padding:2px;gap:1px;
 }
-.btn:hover::after{left:100%}
-.btn:hover{border-color:var(--cyan);color:var(--cyan);background:rgba(34,211,238,.05)}
-.btn:active{transform:scale(.96)}
-
-.btn-calc{
-  background:linear-gradient(135deg,rgba(34,211,238,.12),rgba(34,211,238,.06));
-  color:var(--cyan);border-color:var(--cyan-d);
-  box-shadow:0 0 10px rgba(34,211,238,.12),inset 0 0 20px rgba(34,211,238,.04);
+.tool{
+  appearance:none;border:0;background:transparent;
+  color:var(--fg3);padding:3px 9px;height:26px;
+  border-radius:4px;
+  display:inline-flex;align-items:center;gap:5px;
+  font-size:.73rem;font-weight:500;cursor:pointer;
+  transition:background var(--dur),color var(--dur);
+  white-space:nowrap;font-family:var(--font-ui);
 }
-.btn-calc:hover{
-  background:linear-gradient(135deg,rgba(34,211,238,.22),rgba(34,211,238,.12));
-  box-shadow:0 0 20px rgba(34,211,238,.25);border-color:var(--cyan);
+.tool:hover{background:var(--bg3);color:var(--fg)}
+.tool[data-active="1"]{background:var(--accent);color:var(--accent-ink)}
+/* ── CHIPS (지형 버튼) ── */
+.chip-row{display:flex;gap:4px;flex-shrink:0}
+.chip{
+  appearance:none;height:24px;padding:0 9px;
+  border-radius:var(--r-pill);
+  background:var(--bg2);border:1px solid var(--line-soft);
+  color:var(--fg3);font-size:.71rem;
+  display:inline-flex;align-items:center;gap:4px;
+  cursor:pointer;
+  transition:background var(--dur),color var(--dur),border-color var(--dur);
+  white-space:nowrap;font-family:var(--font-ui);
 }
-
-.btn-reset{background:var(--bg1);color:#334155;border-color:var(--border)}
-.btn-reset:hover{color:var(--red);border-color:#7f1d1d;background:rgba(239,68,68,.06)}
-
-.btn-add{background:rgba(16,185,129,.08);color:var(--green);border-color:rgba(16,185,129,.25);font-size:.65rem}
-.btn-add:hover{background:rgba(16,185,129,.18);border-color:var(--green);color:#fff}
-
-.btn-save{background:rgba(34,211,238,.06);color:var(--cyan);border-color:var(--cyan-d)}
-.btn-save:hover{background:rgba(34,211,238,.16);border-color:var(--cyan)}
-
-.btn-load{background:rgba(192,132,252,.06);color:#c084fc;border-color:rgba(139,92,246,.25)}
-.btn-load:hover{background:rgba(139,92,246,.2);border-color:#8b5cf6;color:#fff}
-
-.hint{font-size:.62rem;color:#5a7a9a;margin-left:auto;font-family:'JetBrains Mono',monospace;}
-
+.chip:hover{background:var(--bg3);color:var(--fg)}
+.chip[data-active="1"]{background:var(--accent-soft);color:var(--accent);border-color:oklch(0.78 0.165 65/.4)}
+.hint{font-size:.62rem;color:var(--fg4);margin-left:auto;font-family:var(--font-mono)}
 /* ── ALLIANCE BUTTONS ── */
 #allianceBtns{display:flex;gap:3px;flex-wrap:wrap}
 .al-btn{
-  padding:3px 8px;border-radius:2px;border:1px solid transparent;
-  font-size:.72rem;font-weight:700;cursor:pointer;transition:all .15s;opacity:.45;
-  font-family:'Rajdhani',sans-serif;letter-spacing:.8px;text-transform:uppercase;
+  padding:3px 9px;border-radius:var(--r-sm);border:1px solid transparent;
+  font-size:.72rem;font-weight:600;cursor:pointer;transition:all .15s;opacity:.45;
+  font-family:var(--font-ui);
 }
 .al-btn:hover{opacity:.75}
-.al-btn.active{
-  opacity:1;color:#fff;
-  box-shadow:0 0 10px currentColor,0 0 20px rgba(0,0,0,.5),inset 0 0 8px rgba(255,255,255,.08);
-}
-.al-rm{font-size:.6rem;margin-left:2px;opacity:.4;cursor:pointer}.al-rm:hover{opacity:1}
-
+.al-btn.active{opacity:1;color:#fff;box-shadow:0 0 10px currentColor,0 0 20px rgba(0,0,0,.5),inset 0 0 8px rgba(255,255,255,.08)}
+.al-rm{font-size:.58rem;margin-left:2px;opacity:.4;cursor:pointer}
+.al-rm:hover{opacity:1}
 /* ── LAYOUT ── */
 .main{display:flex;flex:1;min-height:0}
-.map-wrap{flex:1;overflow:auto;background:var(--bg0);cursor:crosshair;position:relative;}
+.map-wrap{flex:1;overflow:auto;background:oklch(0.07 0.008 250);cursor:crosshair;position:relative}
 canvas#map{display:block;image-rendering:pixelated}
-
-/* map corner brackets */
 .map-wrap::before,.map-wrap::after{
   content:'';position:absolute;width:24px;height:24px;
   pointer-events:none;z-index:10;
-  border-color:rgba(34,211,238,.2);border-style:solid;
+  border-color:oklch(0.82 0.15 195/.2);border-style:solid;
 }
 .map-wrap::before{top:8px;left:8px;border-width:1px 0 0 1px}
 .map-wrap::after{top:8px;right:8px;border-width:1px 1px 0 0}
-
 /* ── SIDEBAR ── */
 .side{
-  width:252px;flex-shrink:0;
-  background:var(--bg1);
-  border-left:1px solid var(--border);
+  width:256px;flex-shrink:0;background:var(--bg1);border-left:1px solid var(--line);
   display:flex;flex-direction:column;overflow:hidden;
   box-shadow:-4px 0 20px rgba(0,0,0,.4);
 }
 .side-tabs{
-  display:flex;border-bottom:1px solid var(--border);flex-shrink:0;
-  background:linear-gradient(180deg,#040810 0%,#050a14 100%);
+  display:flex;border-bottom:1px solid var(--line);flex-shrink:0;
+  background:var(--bg1);padding:5px 5px 0;gap:2px;overflow-x:auto;
 }
 .tab{
-  flex:1;padding:8px 2px;text-align:center;font-size:.78rem;
-  cursor:pointer;color:#3a6080;background:none;border:none;
-  border-bottom:2px solid transparent;transition:all .15s;
+  flex:1;padding:7px 3px 8px;text-align:center;font-size:.8rem;
+  cursor:pointer;color:var(--fg4);background:none;border:none;
+  border-bottom:2px solid transparent;transition:all .15s;border-radius:5px 5px 0 0;
 }
-.tab:hover{color:#5a8aaa}
-.tab.active{
-  color:var(--cyan);border-bottom-color:var(--cyan);
-  background:rgba(34,211,238,.04);
-  text-shadow:0 0 12px rgba(34,211,238,.55);
-}
-
+.tab:hover{color:var(--fg2)}
+.tab.active{color:var(--fg);background:var(--bg2);border-bottom-color:var(--accent)}
 .tab-body{
-  flex:1;overflow-y:auto;padding:10px;display:none;
-  scrollbar-width:thin;scrollbar-color:var(--border2) transparent;
+  flex:1;overflow-y:auto;padding:10px 10px 24px;display:none;
+  scrollbar-width:thin;scrollbar-color:var(--line-soft) transparent;
 }
 .tab-body.show{display:block}
-::-webkit-scrollbar{width:3px;height:3px}
+::-webkit-scrollbar{width:4px;height:4px}
 ::-webkit-scrollbar-track{background:transparent}
-::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
-
+::-webkit-scrollbar-thumb{background:var(--line);border-radius:2px}
 /* ── SECTION HEADERS ── */
 .sec{
-  font-size:.64rem;font-weight:700;color:var(--amber);
-  text-transform:uppercase;margin:10px 0 5px;letter-spacing:1.8px;
-  border-bottom:1px solid rgba(245,158,11,.15);padding-bottom:3px;
+  font-size:.65rem;font-weight:700;color:var(--accent);
+  text-transform:uppercase;margin:10px 0 6px;letter-spacing:1.5px;
+  border-bottom:1px solid oklch(0.78 0.165 65/.15);padding-bottom:4px;
   display:flex;align-items:center;justify-content:space-between;
-  font-family:'Rajdhani',sans-serif;
+  font-family:var(--font-ui);
 }
 .sec:first-child{margin-top:0}
 .sec::before{
-  content:'';display:inline-block;
-  width:3px;height:11px;
-  background:linear-gradient(180deg,var(--amber),rgba(245,158,11,.2));
-  border-radius:1px;box-shadow:0 0 6px var(--amber);
+  content:'';display:inline-block;width:3px;height:11px;
+  background:linear-gradient(180deg,var(--accent),oklch(0.78 0.165 65/.2));
+  border-radius:1px;box-shadow:0 0 6px var(--accent);
   margin-right:5px;flex-shrink:0;
 }
-
 /* ── FORM ── */
 .row{margin-bottom:5px}
 .row label{
-  display:block;font-size:.63rem;color:#7a9abf;
+  display:block;font-size:.63rem;color:var(--fg3);
   margin-bottom:2px;text-transform:uppercase;letter-spacing:.8px;
-  font-family:'Rajdhani',sans-serif;
+  font-family:var(--font-mono);
 }
 .row input[type=number],.row input[type=text]{
-  width:100%;padding:4px 7px;
-  background:var(--bg0);border:1px solid var(--border);border-radius:2px;
-  color:var(--cyan);font-size:.74rem;font-family:'JetBrains Mono',monospace;
-  transition:all .15s;
+  width:100%;padding:5px 7px;
+  background:var(--bg2);border:1px solid var(--line);border-radius:var(--r-sm);
+  color:var(--cyan);font-size:.74rem;font-family:var(--font-mono);
+  transition:all .15s;outline:none;
 }
-.row input:focus{outline:none;border-color:var(--cyan-d);box-shadow:0 0 8px rgba(34,211,238,.08)}
+.row input:focus{border-color:oklch(0.82 0.15 195/.6);box-shadow:0 0 0 2px oklch(0.82 0.15 195/.08)}
 .duo{display:flex;gap:4px}.duo>div{flex:1}
 .trio{display:flex;gap:3px}.trio>div{flex:1}
-.suffix{color:#4a6a8a;font-size:.58rem}
-
+.suffix{color:var(--fg4);font-size:.58rem}
 input[type=datetime-local],input[type=date]{
-  width:100%;padding:4px 7px;background:var(--bg0);
-  border:1px solid var(--border);border-radius:2px;
-  color:var(--cyan);font-size:.7rem;font-family:'JetBrains Mono',monospace;
+  width:100%;padding:4px 7px;background:var(--bg2);
+  border:1px solid var(--line);border-radius:var(--r-sm);
+  color:var(--cyan);font-size:.7rem;font-family:var(--font-mono);outline:none;
 }
 select{
-  background:var(--bg0);border:1px solid var(--border);border-radius:2px;
-  color:var(--txt);font-size:.7rem;padding:2px 4px;
+  background:var(--bg2);border:1px solid var(--line);border-radius:var(--r-sm);
+  color:var(--fg2);font-size:.7rem;padding:2px 5px;
 }
-
 /* ── CARDS ── */
 .al-card{
-  background:var(--bg2);border-radius:2px;padding:8px;margin-bottom:7px;
-  border-left:2px solid var(--border2);position:relative;
+  background:var(--bg2);border-radius:var(--r-md);padding:8px;margin-bottom:6px;
+  border-left:2px solid var(--line-soft);
 }
-.al-card::after{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.04),transparent)}
 .al-card-hdr{display:flex;align-items:center;gap:6px;margin-bottom:6px}
 .al-name-input{
   flex:1;background:transparent;border:none;
-  border-bottom:1px solid var(--border);color:var(--txt2);
-  font-size:.8rem;font-weight:700;padding:1px 3px;
-  font-family:'Rajdhani',sans-serif;letter-spacing:.5px;
+  border-bottom:1px solid var(--line);color:var(--fg);
+  font-size:.8rem;font-weight:600;padding:1px 3px;
+  font-family:var(--font-ui);
 }
-.al-name-input:focus{outline:none;border-bottom-color:var(--amber)}
+.al-name-input:focus{outline:none;border-bottom-color:var(--accent)}
 .al-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;box-shadow:0 0 5px currentColor}
 .rm-btn{
-  background:rgba(239,68,68,.08);color:#f87171;
-  border:1px solid rgba(239,68,68,.2);border-radius:2px;
+  background:oklch(0.68 0.20 25/.08);color:var(--bad);
+  border:1px solid oklch(0.68 0.20 25/.25);border-radius:var(--r-sm);
   padding:2px 6px;font-size:.6rem;cursor:pointer;margin-left:auto;
-  font-family:'Rajdhani',sans-serif;transition:all .15s;
+  font-family:var(--font-ui);transition:all .15s;
 }
-.rm-btn:hover{background:rgba(239,68,68,.2);color:#fff}
-
+.rm-btn:hover{background:oklch(0.68 0.20 25/.2);color:var(--fg)}
 .city-item{
-  background:var(--bg2);border-radius:2px;padding:7px;
-  margin-bottom:5px;border-left:2px solid var(--border);
+  background:var(--bg2);border-radius:var(--r-md);padding:7px;
+  margin-bottom:5px;border-left:2px solid var(--line-soft);
 }
 .city-hdr{display:flex;align-items:center;gap:5px;margin-bottom:5px}
 .city-hdr select{flex:1}
 .city-name-input{
   flex:1;background:transparent;border:none;
-  border-bottom:1px solid var(--border);color:var(--txt);
+  border-bottom:1px solid var(--line);color:var(--fg2);
   font-size:.72rem;padding:1px 3px;
 }
 .city-name-input:focus{outline:none;border-bottom-color:var(--cyan)}
-
 /* ── RESULT CARDS ── */
 .card{
-  background:var(--bg2);border-radius:2px;padding:8px;margin-bottom:5px;
-  border:1px solid var(--border);position:relative;overflow:hidden;
+  background:var(--bg2);border-radius:var(--r-md);padding:9px 10px;margin-bottom:5px;
+  border:1px solid var(--line-soft);position:relative;overflow:hidden;
 }
 .card::before{
   content:'';position:absolute;top:0;left:0;right:0;height:1px;
-  background:linear-gradient(90deg,transparent,rgba(34,211,238,.15),transparent);
-}
-.card::after{
-  content:'';position:absolute;bottom:0;right:0;
-  width:10px;height:10px;
-  border-right:1px solid rgba(34,211,238,.18);
-  border-bottom:1px solid rgba(34,211,238,.18);
+  background:linear-gradient(90deg,transparent,oklch(0.82 0.15 195/.12),transparent);
 }
 .card-row{display:flex;justify-content:space-between;font-size:.74rem;margin:3px 0;gap:4px}
 .badge{
-  display:inline-block;padding:2px 8px;border-radius:1px;
+  display:inline-block;padding:2px 7px;border-radius:var(--r-sm);
   font-size:.65rem;font-weight:700;margin-top:3px;
-  font-family:'Rajdhani',sans-serif;letter-spacing:1px;text-transform:uppercase;
+  font-family:var(--font-mono);text-transform:uppercase;
 }
-.win{background:rgba(16,185,129,.12);color:#34d399;border:1px solid rgba(16,185,129,.25)}
-.lose{background:rgba(239,68,68,.08);color:#f87171;border:1px solid rgba(239,68,68,.18)}
-.tie{background:var(--bg3);color:#475569;border:1px solid var(--border)}
-
-table{width:100%;border-collapse:collapse;font-size:.66rem;font-family:'JetBrains Mono',monospace}
+.win{background:oklch(0.78 0.14 155/.12);color:var(--good);border:1px solid oklch(0.78 0.14 155/.25)}
+.lose{background:oklch(0.68 0.20 25/.08);color:var(--bad);border:1px solid oklch(0.68 0.20 25/.2)}
+.tie{background:var(--bg3);color:var(--fg4);border:1px solid var(--line)}
+table{width:100%;border-collapse:collapse;font-size:.66rem;font-family:var(--font-mono)}
 th{
-  background:var(--bg0);color:var(--amber);padding:4px 2px;
-  text-align:center;font-family:'Rajdhani',sans-serif;font-size:.63rem;
-  letter-spacing:1px;text-transform:uppercase;border-bottom:1px solid var(--border);
+  background:var(--bg1);color:var(--accent);padding:4px 2px;
+  text-align:center;font-family:var(--font-ui);font-size:.63rem;
+  letter-spacing:1px;text-transform:uppercase;border-bottom:1px solid var(--line);
 }
-td{padding:3px 2px;text-align:center;border-bottom:1px solid rgba(13,28,56,.6)}
-tr:hover td{background:rgba(34,211,238,.025)}
-.warn{color:#fbbf24}.ok{color:var(--green)}
-
+td{padding:3px 2px;text-align:center;border-bottom:1px solid oklch(0.15 0.014 250/.8)}
+tr:hover td{background:oklch(0.82 0.15 195/.025)}
+.warn{color:var(--warn)}.ok{color:var(--good)}
 /* ── TOOLTIP ── */
 [data-tip]{position:relative}
 [data-tip]::after{
   content:attr(data-tip);
   position:absolute;top:calc(100% + 6px);left:50%;transform:translateX(-50%);
-  background:#0a1828;color:#c8daf0;font-size:.63rem;font-family:'JetBrains Mono',monospace;
-  padding:4px 9px;border-radius:3px;border:1px solid #1e3a5f;white-space:nowrap;
+  background:var(--bg2);color:var(--fg2);font-size:.63rem;font-family:var(--font-mono);
+  padding:4px 9px;border-radius:var(--r-sm);border:1px solid var(--line);white-space:nowrap;
   pointer-events:none;opacity:0;transition:opacity .15s;z-index:10000;
-  box-shadow:0 4px 12px rgba(0,0,0,.8);letter-spacing:.3px;
+  box-shadow:0 4px 12px rgba(0,0,0,.6);
 }
 [data-tip]::before{
   content:'';position:absolute;top:calc(100% + 1px);left:50%;transform:translateX(-50%);
-  border:4px solid transparent;border-bottom-color:#1e3a5f;
+  border:4px solid transparent;border-bottom-color:var(--line);
   pointer-events:none;opacity:0;transition:opacity .15s;z-index:10001;
 }
 [data-tip]:hover::after,[data-tip]:hover::before{opacity:1}
-
-/* STATUS BAR ── */
+/* ── STATUS BAR ── */
 .posbar{
-  font-size:.63rem;color:#4a6a8a;padding:2px 10px;
-  background:linear-gradient(90deg,#02040b,#030609,#02040b);
-  border-top:1px solid var(--border);
-  flex-shrink:0;height:22px;font-family:'JetBrains Mono',monospace;
+  font-size:.63rem;color:var(--fg4);padding:2px 10px;
+  background:var(--bg1);border-top:1px solid var(--line);
+  flex-shrink:0;height:22px;font-family:var(--font-mono);
   display:flex;align-items:center;gap:8px;
 }
-.posbar::before{content:'◆';color:var(--amber);font-size:.5rem;opacity:.5}
+.posbar::before{content:'◆';color:var(--accent);font-size:.5rem;opacity:.5}
 </style>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
@@ -341,67 +311,57 @@ tr:hover td{background:rgba(34,211,238,.025)}
     <span class="sep">│</span>
     <div id="allianceBtns"></div>
     <span class="sep">│</span>
-    <div id="towerModeBtns" style="display:flex;gap:3px">
-      <button class="btn" id="tmPointer" onclick="setTowerMode('pointer')"
-        data-tip="일반 마우스 모드 — 건설/철거/점화 없음"
-        style="background:#1a3a1a;color:#4ade80;border:1px solid #2e7d32;padding:3px 8px">🖱 일반</button>
-      <button class="btn" id="tmBuild"  onclick="setTowerMode('build')"
-        data-tip="캔버스 클릭으로 타워 건설"
-        style="background:#1a2a3a;color:#a8d8ff;border:1px solid #334;padding:3px 8px">🔨 건설</button>
-      <button class="btn" id="tmDemol"  onclick="setTowerMode('demolish')"
-        data-tip="타워 클릭으로 철거"
-        style="background:#1a2a3a;color:#a8d8ff;border:1px solid #334;padding:3px 8px">🔧 철거</button>
-      <button class="btn" id="tmIgnite" onclick="setTowerMode('ignite')"
-        data-tip="타워 클릭으로 점화 — 내구도 초당 감소"
-        style="background:#1a2a3a;color:#ffae33;border:1px solid #334;padding:3px 8px">🔥 점화</button>
+    <div class="tool-group" id="towerModeBtns">
+      <button class="tool" id="tmPointer" onclick="setTowerMode('pointer')"
+        data-tip="일반 마우스 모드 — 건설/철거/점화 없음">🖱 일반</button>
+      <button class="tool" id="tmBuild"  onclick="setTowerMode('build')"
+        data-tip="캔버스 클릭으로 타워 건설">🔨 건설</button>
+      <button class="tool" id="tmDemol"  onclick="setTowerMode('demolish')"
+        data-tip="타워 클릭으로 철거">🔧 철거</button>
+      <button class="tool" id="tmIgnite" onclick="setTowerMode('ignite')"
+        data-tip="타워 클릭으로 점화 — 내구도 초당 감소">🔥 점화</button>
     </div>
-    <button class="btn" onclick="undoTower()"
-      data-tip="마지막 타워 건설 취소"
-      style="background:#37474f;color:#d4dce6;border:1px solid #455a64;padding:3px 9px">↩ 취소</button>
+    <button class="btn btn-reset" onclick="undoTower()"
+      data-tip="마지막 타워 건설 취소">↩ 취소</button>
     <span class="sep">│</span>
     <button class="btn btn-calc" onclick="runSim()"
       data-tip="모든 연맹 경로·도달 시간 계산">▶ 계산</button>
     <button class="btn btn-reset" onclick="fullReset()"
       data-tip="모든 데이터 초기화 — 타워·경유지·도시점령·동맹관계·저장값 전체 삭제">🗑 초기화</button>
     <span class="sep">│</span>
-    <button class="btn" onclick="showRanking()"
+    <button class="btn" id="btnRanking" onclick="showRanking()"
       data-tip="현재 점수 기준 랭킹 순위표 (동점 시 도시 점령 시각 우선)"
-      style="background:rgba(255,215,0,.08);color:#ffd700;border:1px solid rgba(255,215,0,.3);padding:3px 9px">🏆 랭킹</button>
-    <button class="btn" id="tmRoute" onclick="setTowerMode('route')"
+      style="color:var(--warn)">🏆 랭킹</button>
+    <button class="tool" id="tmRoute" onclick="setTowerMode('route')"
       data-tip="경로 모드: 활성화 후 맵에서 우클릭 → 목표 도시까지 경로 계산"
-      style="background:rgba(96,165,250,.08);color:#60a5fa;border:1px solid rgba(96,165,250,.3);padding:3px 9px">🗺 경로</button>
+      style="color:var(--cyan)">🗺 경로</button>
     <span class="sep">│</span>
     <button class="btn" id="allyModeBtn" onclick="enterAllyMode()"
       data-tip="헬기장 클릭으로 동맹 선택 → 완료"
-      style="background:rgba(16,185,129,.08);color:#4ade80;border:1px solid rgba(16,185,129,.3)">🤝 동맹 설정</button>
+      style="color:var(--good)">🤝 동맹 설정</button>
     <button class="btn" id="allyConfirmBtn" onclick="confirmAllyMode()"
       data-tip="선택한 연맹들로 동맹 결성 (1개 선택 시 동맹 해제)"
-      style="display:none;background:rgba(16,185,129,.2);color:#4ade80;border:1px solid #16a34a">✓ 완료</button>
+      style="display:none;color:var(--good);border-color:oklch(0.78 0.14 155/.4)">✓ 완료</button>
     <button class="btn" id="allyCancelBtn" onclick="exitAllyMode()"
       data-tip="동맹 설정 취소"
-      style="display:none;background:rgba(239,68,68,.08);color:#f87171;border:1px solid rgba(239,68,68,.3)">✕ 취소</button>
+      style="display:none;color:var(--bad);border-color:oklch(0.68 0.20 25/.3)">✕ 취소</button>
   </div>
   <!-- 2행: 지형 -->
   <div class="hdr-row">
-    <span style="font-size:.65rem;color:#5a7a9a">지형:</span>
-    <div id="terrainModeBtns" style="display:flex;gap:3px">
-      <button class="btn" id="tmRiver"    onclick="setTerrainMode('river')"
-        data-tip="강 드래그 그리기 — 타워 배치 불가 구역"
-        style="background:#1a2a3a;color:#a8d8ff;border:1px solid #334;padding:2px 8px">🌊 강</button>
-      <button class="btn" id="tmBridge"   onclick="setTerrainMode('bridge')"
-        data-tip="다리 드래그 그리기 — 강 위 통로"
-        style="background:#1a2a3a;color:#b09080;border:1px solid #334;padding:2px 8px">🌉 다리</button>
-      <button class="btn" id="tmMountain" onclick="setTerrainMode('mountain')"
-        data-tip="산 드래그 그리기 — 타워 배치 불가 구역"
-        style="background:#1a2a3a;color:#aec5d0;border:1px solid #334;padding:2px 8px">⛰ 산</button>
-      <button class="btn" id="tmTerrainOff" onclick="setTerrainMode(null)"
-        data-tip="지형 그리기 모드 해제"
-        style="background:#455a64;color:#d4dce6;border:1px solid #546e7a;padding:2px 8px">OFF</button>
+    <span style="font-size:.62rem;color:var(--fg4);font-family:var(--font-mono);text-transform:uppercase;letter-spacing:.08em">지형</span>
+    <div class="chip-row" id="terrainModeBtns">
+      <button class="chip" id="tmRiver"    onclick="setTerrainMode('river')"
+        data-tip="강 드래그 그리기 — 타워 배치 불가 구역">🌊 강</button>
+      <button class="chip" id="tmBridge"   onclick="setTerrainMode('bridge')"
+        data-tip="다리 드래그 그리기 — 강 위 통로">🌉 다리</button>
+      <button class="chip" id="tmMountain" onclick="setTerrainMode('mountain')"
+        data-tip="산 드래그 그리기 — 타워 배치 불가 구역">⛰ 산</button>
+      <button class="chip" id="tmTerrainOff" onclick="setTerrainMode(null)"
+        data-tip="지형 그리기 모드 해제">OFF</button>
     </div>
-    <button class="btn" onclick="undoTerrain()"
-      data-tip="마지막 지형 삭제"
-      style="background:#37474f;color:#d4dce6;border:1px solid #455a64;padding:2px 9px">↩ 지형</button>
-    <span class="hint" style="margin-left:auto">클릭:건설/철거/점화 | 휠클릭:맵이동 | 휠:줌 | 영토드래그:이동 | 도시우클릭:소유권</span>
+    <button class="btn btn-reset" onclick="undoTerrain()"
+      data-tip="마지막 지형 삭제">↩ 지형</button>
+    <span class="hint">클릭:건설/철거/점화 | 휠클릭:맵이동 | 휠:줌 | 영토드래그:이동 | 도시우클릭:소유권</span>
   </div>
   <!-- 3행: 전장 세션 -->
   <div class="hdr-row" style="gap:6px;min-height:28px;padding:2px 0;align-items:center">
@@ -809,19 +769,14 @@ const TOWER_DEFAULTS = { maxHp:7200, burnRatePerSec:5, burnDurationSec:900 };
 
 function setTowerMode(m) {
   towerMode = m;
-  const cfg = {
-    pointer: {id:'tmPointer', bg:'#1a3a1a', border:'#4ade80', color:'#4ade80'},
-    build:   {id:'tmBuild',   bg:'#1565c0', border:'#4fc3f7', color:'#fff'},
-    demolish:{id:'tmDemol',   bg:'#b71c1c', border:'#ef5350', color:'#fff'},
-    ignite:  {id:'tmIgnite',  bg:'#e65100', border:'#ff9800', color:'#fff'},
-    route:   {id:'tmRoute',   bg:'#1a2040', border:'#60a5fa', color:'#60a5fa'}
-  };
-  Object.entries(cfg).forEach(([k,s])=>{
-    const btn=document.getElementById(s.id); if(!btn) return;
-    btn.style.background  = k===m ? s.bg      : '#1a2a3a';
-    btn.style.color       = k===m ? s.color   : (k==='ignite'?'#ffae33':k==='route'?'#60a5fa':'#a8d8ff');
-    btn.style.borderColor = k===m ? s.border  : '#334';
+  ['tmPointer','tmBuild','tmDemol','tmIgnite','tmRoute'].forEach(id=>{
+    const btn=document.getElementById(id); if(!btn) return;
+    btn.removeAttribute('data-active');
+    btn.style.color='';
   });
+  const activeIds={pointer:'tmPointer',build:'tmBuild',demolish:'tmDemol',ignite:'tmIgnite',route:'tmRoute'};
+  const activeBtn=document.getElementById(activeIds[m]);
+  if(activeBtn) activeBtn.setAttribute('data-active','1');
   canvas.style.cursor = m==='pointer' ? 'default' : 'crosshair';
 }
 
@@ -1386,17 +1341,12 @@ function loadLS(){
 // ── 지형 ────────────────────────────────────────────────
 function setTerrainMode(mode){
   terrainMode=mode; drawingTerrain=null;
-  const defs={river:{id:'tmRiver',bg:'#1565c0',bd:'#42a5f5'},
-               bridge:{id:'tmBridge',bg:'#4e342e',bd:'#8d6e63'},
-               mountain:{id:'tmMountain',bg:'#37474f',bd:'#90a4ae'}};
-  Object.entries(defs).forEach(([k,s])=>{
-    const btn=document.getElementById(s.id); if(!btn) return;
-    btn.style.background =k===mode?s.bg:'#1a2a3a';
-    btn.style.color      =k===mode?'#fff':s.bd;
-    btn.style.borderColor=k===mode?s.bd:'#334';
+  ['tmRiver','tmBridge','tmMountain','tmTerrainOff'].forEach(id=>{
+    const btn=document.getElementById(id); if(!btn) return;
+    btn.removeAttribute('data-active');
   });
-  const off=document.getElementById('tmTerrainOff');
-  if(off){off.style.background=mode===null?'#455a64':'#37474f';}
+  const activeId={river:'tmRiver',bridge:'tmBridge',mountain:'tmMountain'}[mode]||(mode===null?'tmTerrainOff':null);
+  if(activeId){const btn=document.getElementById(activeId);if(btn)btn.setAttribute('data-active','1');}
 }
 
 function undoTerrain(){
