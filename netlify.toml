@@ -1,4 +1,2 @@
-[[redirects]]
-  from = "/"
-  to = "/simulator.html"
-  status = 200
+[build]
+  publish = "."
