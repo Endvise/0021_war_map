@@ -1,0 +1,1143 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SLG 전장 타워 시뮬레이터</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',sans-serif;background:#12121f;color:#ddd;display:flex;flex-direction:column;height:100vh;overflow:hidden}
+header{padding:6px 10px;background:#1a1a2e;border-bottom:1px solid #2a2a4a;display:flex;align-items:center;gap:8px;flex-shrink:0;flex-wrap:wrap}
+header h1{color:#4fc3f7;font-size:.9rem;white-space:nowrap}
+.sep{color:#333;font-size:.8rem}
+.btn{padding:4px 9px;border:none;border-radius:4px;cursor:pointer;font-size:.73rem;font-weight:600;white-space:nowrap}
+.btn-calc{background:#0288d1;color:#fff}.btn-calc:hover{background:#0277bd}
+.btn-reset{background:#37474f;color:#ccc}.btn-reset:hover{background:#455a64}
+.btn-add{background:#1b3a1b;color:#81c784;border:1px solid #2e7d32;font-size:.7rem}
+.btn-add:hover{background:#2e7d32;color:#fff}
+.btn-save{background:#1a2a4a;color:#90caf9;border:1px solid #1565c0}.btn-save:hover{background:#1565c0;color:#fff}
+.btn-load{background:#2a1a4a;color:#ce93d8;border:1px solid #6a1b9a}.btn-load:hover{background:#6a1b9a;color:#fff}
+.hint{font-size:.65rem;color:#444;margin-left:auto}
+
+/* 연맹 버튼 */
+#allianceBtns{display:flex;gap:4px;flex-wrap:wrap}
+.al-btn{padding:4px 8px;border-radius:4px;border:2px solid transparent;font-size:.73rem;font-weight:700;cursor:pointer;transition:all .12s;opacity:.6}
+.al-btn.active{opacity:1;color:#fff}
+.al-rm{font-size:.65rem;margin-left:3px;opacity:.6;cursor:pointer}.al-rm:hover{opacity:1}
+
+.main{display:flex;flex:1;min-height:0}
+.map-wrap{flex:1;overflow:auto;background:#0a0f1a;cursor:crosshair}
+canvas#map{display:block;image-rendering:pixelated}
+
+.side{width:240px;flex-shrink:0;background:#1e1e30;border-left:1px solid #2a2a4a;display:flex;flex-direction:column;overflow:hidden}
+.side-tabs{display:flex;border-bottom:1px solid #2a2a4a;flex-shrink:0}
+.tab{flex:1;padding:6px 2px;text-align:center;font-size:.67rem;cursor:pointer;color:#555;background:none;border:none;border-bottom:2px solid transparent}
+.tab.active{color:#4fc3f7;border-bottom-color:#4fc3f7}
+.tab-body{flex:1;overflow-y:auto;padding:9px;display:none}
+.tab-body.show{display:block}
+
+.sec{font-size:.64rem;font-weight:700;color:#4fc3f7;text-transform:uppercase;margin:8px 0 4px;letter-spacing:.4px;border-bottom:1px solid #1e2a4a;padding-bottom:3px;display:flex;align-items:center;justify-content:space-between}
+.sec:first-child{margin-top:0}
+.row{margin-bottom:5px}
+.row label{display:block;font-size:.67rem;color:#888;margin-bottom:2px}
+.row input[type=number],.row input[type=text]{width:100%;padding:3px 6px;background:#0d1b2e;border:1px solid #334;border-radius:3px;color:#eee;font-size:.77rem}
+.duo{display:flex;gap:4px}.duo>div{flex:1}
+.trio{display:flex;gap:3px}.trio>div{flex:1}
+.suffix{color:#555;font-size:.6rem}
+
+/* 연맹 카드 (설정 탭) */
+.al-card{background:#0d1825;border-radius:5px;padding:7px;margin-bottom:8px;border-left:3px solid #334}
+.al-card-hdr{display:flex;align-items:center;gap:6px;margin-bottom:6px}
+.al-name-input{flex:1;background:transparent;border:none;border-bottom:1px solid #334;color:#eee;font-size:.8rem;font-weight:700;padding:1px 3px}
+.al-name-input:focus{outline:none;border-bottom-color:#4fc3f7}
+.al-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.rm-btn{background:#3a1010;color:#ef9a9a;border:1px solid #7f0000;border-radius:3px;padding:2px 6px;font-size:.65rem;cursor:pointer;margin-left:auto}
+.rm-btn:hover{background:#7f0000;color:#fff}
+
+/* 도시 아이템 */
+.city-item{background:#0d1825;border-radius:5px;padding:7px;margin-bottom:6px;border-left:3px solid #334}
+.city-hdr{display:flex;align-items:center;gap:5px;margin-bottom:5px}
+.city-hdr select{flex:1;background:#0d1b2e;border:1px solid #334;border-radius:3px;color:#eee;font-size:.72rem;padding:2px}
+.city-name-input{flex:1;background:transparent;border:none;border-bottom:1px solid #334;color:#eee;font-size:.75rem;padding:1px 3px}
+.city-name-input:focus{outline:none;border-bottom-color:#4fc3f7}
+
+/* 결과 */
+.card{background:#0f1e35;border-radius:5px;padding:8px;margin-bottom:6px}
+.card-row{display:flex;justify-content:space-between;font-size:.77rem;margin:3px 0}
+.badge{display:inline-block;padding:2px 7px;border-radius:10px;font-size:.68rem;font-weight:700;margin-top:3px}
+.win{background:#1b5e20;color:#a5d6a7}.lose{background:#7f0000;color:#ffcdd2}.tie{background:#333;color:#ccc}
+table{width:100%;border-collapse:collapse;font-size:.64rem}
+th{background:#0d1b35;color:#90caf9;padding:3px 2px;text-align:center}
+td{padding:2px 3px;text-align:center;border-bottom:1px solid #1e3040}
+.warn{color:#ffb74d}.ok{color:#81c784}
+.posbar{font-size:.67rem;color:#4fc3f7;padding:2px 8px;background:#080e18;border-top:1px solid #1a2a3a;flex-shrink:0;height:20px}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>⚔️ SLG 시뮬레이터</h1>
+  <span class="sep">│</span>
+  <div id="allianceBtns"></div>
+  <button class="btn btn-add" onclick="addAlliance()">+ 연맹</button>
+  <span class="sep">│</span>
+  <div id="towerModeBtns" style="display:flex;gap:3px">
+    <button class="btn" id="tmBuild"  onclick="setTowerMode('build')"
+      style="background:#1565c0;color:#fff;border:1px solid #4fc3f7;padding:4px 8px">🔨 건설</button>
+    <button class="btn" id="tmDemol"  onclick="setTowerMode('demolish')"
+      style="background:#1a2a3a;color:#90caf9;border:1px solid #334;padding:4px 8px">🔧 철거</button>
+    <button class="btn" id="tmIgnite" onclick="setTowerMode('ignite')"
+      style="background:#1a2a3a;color:#ff9800;border:1px solid #334;padding:4px 8px">🔥 점화</button>
+  </div>
+  <button class="btn" onclick="undoTower()"
+    style="background:#37474f;color:#ccc;border:1px solid #455a64;padding:4px 9px">↩ 취소</button>
+  <span class="sep">│</span>
+  <button class="btn btn-calc"  onclick="runSim()">▶ 계산</button>
+  <button class="btn btn-reset" onclick="resetTowers()">🗑 초기화</button>
+  <span class="sep">│</span>
+  <span style="font-size:.68rem;color:#888">스냅:</span>
+  <div id="snapBtns" style="display:flex;gap:3px">
+    <button class="btn" id="snap1" onclick="setSnap(1)" style="padding:3px 7px;background:#1a2a3a;color:#90caf9;border:1px solid #334">1×1</button>
+    <button class="btn" id="snap2" onclick="setSnap(2)" style="padding:3px 7px;background:#1a2a3a;color:#90caf9;border:1px solid #334">2×2</button>
+    <button class="btn" id="snap3" onclick="setSnap(3)" style="padding:3px 7px;background:#1565c0;color:#fff;border:1px solid #4fc3f7">3×3</button>
+  </div>
+  <span class="hint">클릭:건설/철거/점화 | 휠:줌 | 영토드래그:이동</span>
+</header>
+
+<div class="main">
+  <div class="map-wrap" id="mapWrap"><canvas id="map"></canvas></div>
+  <div class="side">
+    <div class="side-tabs">
+      <button class="tab active" onclick="showTab('tpl',this)">🗺</button>
+      <button class="tab"        onclick="showTab('cfg',this)">⚙</button>
+      <button class="tab"        onclick="showTab('rel',this)">🤝</button>
+      <button class="tab"        onclick="showTab('ocp',this)">🏙</button>
+      <button class="tab"        onclick="showTab('evt',this)">⏰</button>
+      <button class="tab"        onclick="showTab('brn',this)">🔥</button>
+      <button class="tab"        onclick="showTab('res',this)">📊</button>
+    </div>
+
+    <!-- 템플릿 탭 -->
+    <div class="tab-body show" id="tabTpl">
+      <div class="sec">맵 크기</div>
+      <div class="duo">
+        <div class="row"><label>너비</label><input id="tMapW" type="number" value="404"></div>
+        <div class="row"><label>높이</label><input id="tMapH" type="number" value="398"></div>
+      </div>
+
+      <div class="sec">
+        <span>🗼 타워 규칙</span>
+      </div>
+      <div class="duo">
+        <div class="row"><label>건설시간<span class="suffix">(분)</span></label><input id="tBuildMin" type="number" value="45"></div>
+        <div class="row"><label>전소시간<span class="suffix">(분)</span></label><input id="tBurnMin"  type="number" value="30"></div>
+      </div>
+      <div class="duo">
+        <div class="row"><label>타워 총 내구도</label><input id="tTowerHp"   type="number" value="7200"></div>
+        <div class="row"><label>점화 감소<span class="suffix">(초당)</span></label><input id="tBurnRate" type="number" value="5"></div>
+      </div>
+      <div style="font-size:.68rem;color:#666;background:#0d1420;border-radius:3px;padding:5px 7px;margin-bottom:4px">
+        💰 탑 비용: 1~5→10.5k │ 6~10→17.5k │ 11~15→21k<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;16~25→24.5k │ 26~30→28k │ 31~35→30.7k<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;36~40→36.4k │ 41+→42k
+      </div>
+
+      <div class="sec">
+        <span>🏙 점령 기지</span>
+        <button class="btn btn-add" style="padding:1px 6px;font-size:.62rem" onclick="addCity()">+ 추가</button>
+      </div>
+      <div id="cityList"></div>
+
+      <div style="display:flex;gap:5px;margin-top:10px">
+        <button class="btn btn-save" style="flex:1" onclick="saveTemplate()">💾 저장</button>
+        <button class="btn btn-load" style="flex:1" onclick="document.getElementById('fileIn').click()">📂 불러오기</button>
+      </div>
+      <input type="file" id="fileIn" accept=".json" style="display:none" onchange="loadTemplate(event)">
+      <button class="btn btn-calc" style="width:100%;margin-top:5px" onclick="applyTemplate()">✅ 맵에 적용</button>
+
+      <div class="sec" style="margin-top:10px">🎯 목표 좌표</div>
+      <div class="duo">
+        <div class="row"><label>X</label><input id="tgtX" type="number" value="200"></div>
+        <div class="row"><label>Y</label><input id="tgtY" type="number" value="200"></div>
+      </div>
+    </div>
+
+    <!-- 연맹 설정 탭 -->
+    <div class="tab-body" id="tabCfg">
+      <div id="allianceCfgList"></div>
+      <button class="btn btn-add" style="width:100%;margin-top:4px;padding:7px" onclick="addAlliance()">+ 연맹 추가</button>
+    </div>
+
+    <!-- 동맹 관계 탭 -->
+    <div class="tab-body" id="tabRel">
+      <div class="sec">🤝 연맹 간 관계 설정</div>
+      <div style="font-size:.65rem;color:#666;margin-bottom:6px">🟢동맹 ⚪중립 🔴적대</div>
+      <div id="relMatrix"></div>
+      <div class="sec" style="margin-top:10px">🏆 진영별 합산 점수</div>
+      <div id="relTeamScore"></div>
+    </div>
+
+    <!-- 이벤트 일정 탭 -->
+    <div class="tab-body" id="tabEvt">
+      <div class="sec">⏰ UTC 시간</div>
+      <div style="background:#0d1825;border-radius:5px;padding:8px;margin-bottom:8px">
+        <div style="font-size:.72rem;color:#888;margin-bottom:4px">현재 UTC</div>
+        <div id="utcClock" style="font-size:1rem;font-weight:700;color:#4fc3f7;font-family:monospace">--:--:--</div>
+        <button class="btn btn-calc" style="width:100%;margin-top:6px;padding:4px" onclick="syncUTC()">🔄 현재 시간으로 동기화</button>
+      </div>
+      <div class="sec">🔮 예측 시간 설정</div>
+      <div class="row"><label>예측 기준 UTC 시간</label>
+        <input type="datetime-local" id="simTimeInput"
+          style="width:100%;padding:3px 6px;background:#0d1b2e;border:1px solid #334;border-radius:3px;color:#eee;font-size:.75rem"
+          oninput="setSimTime(this.value)">
+      </div>
+      <button class="btn btn-reset" style="width:100%;padding:4px;margin-bottom:8px" onclick="clearSimTime()">실시간 모드로 복귀</button>
+      <div class="sec">📅 이벤트 시작일 (금요일 UTC)</div>
+      <div class="row"><label>이벤트 시작 날짜</label>
+        <input type="date" id="eventStartDate"
+          style="width:100%;padding:3px 6px;background:#0d1b2e;border:1px solid #334;border-radius:3px;color:#eee;font-size:.75rem"
+          oninput="renderEvtTab()">
+      </div>
+      <div id="evtStatus" style="margin-top:8px"></div>
+      <div class="sec" style="margin-top:10px">💎 코인추격 현황</div>
+      <div id="coinChaseStatus"></div>
+    </div>
+
+    <!-- 전소 계산 탭 -->
+    <div class="tab-body" id="tabBrn">
+      <div class="sec">🔥 타워 전소 시간 계산</div>
+      <div id="burnList"></div>
+      <button class="btn btn-add" style="width:100%;margin-top:6px" onclick="addBurnTower()">+ 타워 추가</button>
+      <div id="burnResults" style="margin-top:10px"></div>
+    </div>
+
+    <!-- 점령현황 탭 -->
+    <div class="tab-body" id="tabOcp">
+      <div class="sec">🏙 도시 점령 현황</div>
+      <div id="ocpCityList"></div>
+      <div class="sec" style="margin-top:10px">💎 프리즘코인 보유</div>
+      <div id="ocpPrismList"></div>
+      <div class="sec" style="margin-top:10px">🏆 현재 랭킹</div>
+      <div id="ocpRanking"></div>
+    </div>
+
+    <!-- 결과 탭 -->
+    <div class="tab-body" id="tabRes">
+      <div id="resultCards"><p style="color:#444;font-size:.74rem">계산 후 표시됩니다.</p></div>
+    </div>
+  </div>
+</div>
+<div class="posbar" id="posBar"></div>
+
+<script>
+// ── 상수 ──────────────────────────────────────────────
+const TS = 9, GAP = 3;
+let snapMode = 3;
+
+// ── 타워 비용 룩업테이블 (실제 게임 데이터) ──────────
+const TOWER_COSTS = [
+  {max:5,  cost:10500}, {max:10, cost:17500}, {max:15, cost:21000},
+  {max:25, cost:24500}, {max:30, cost:28000}, {max:35, cost:30700},
+  {max:40, cost:36400}, {max:50, cost:42000}
+];
+function getTowerCost(n) {
+  for (const t of TOWER_COSTS) if (n <= t.max) return t.cost;
+  return 42000;
+}
+
+// ── 시멘트 분당 생산량 (점유 도시 기반) ──────────────
+const CITY_PROD = {
+  6: [0, 20, 30, 40],   // 0~3개 점유
+  7: [0, 30, 45, 60],
+  8: [0, 50]            // 0 or 1개
+};
+function calcProd(c6, c7, c8) {
+  return 100
+    + (CITY_PROD[6][Math.min(c6, 3)] || 0)
+    + (CITY_PROD[7][Math.min(c7, 3)] || 0)
+    + (c8 >= 1 ? 50 : 0);
+}
+
+// 타워 좌표에서 연결된 도시 인덱스 집합 반환
+function checkCityConn(tx, ty, connectedSet) {
+  const newlyConnected = [];
+  cities.forEach((c, ci) => {
+    if (connectedSet.has(ci)) return;
+    const gx = Math.max(0, Math.abs(tx - c.x) - (TS/2 + c.r));
+    const gy = Math.max(0, Math.abs(ty - c.y) - (TS/2 + c.r));
+    if (gx <= GAP && gy <= GAP) {
+      connectedSet.add(ci);
+      newlyConnected.push(ci);
+    }
+  });
+  return newlyConnected;
+}
+
+// 연결된 도시 집합으로 분당 생산량 계산
+function calcProdFromSet(connectedSet) {
+  let c6=0, c7=0, c8=0;
+  connectedSet.forEach(ci => {
+    const lv = cities[ci]?.level;
+    if (lv===6) c6++; else if (lv===7) c7++; else if (lv===8) c8++;
+  });
+  return calcProd(c6, c7, c8);
+}
+
+// 현재 배치된 타워들로부터 연결 도시 목록 반환
+function getConnectedCities(towers) {
+  const set = new Set();
+  towers.forEach(t => checkCityConn(t.x, t.y, set));
+  return set;
+}  // 1, 2, or 3
+
+function setSnap(s) {
+  snapMode = s;
+  [1,2,3].forEach(n => {
+    const btn = document.getElementById('snap'+n);
+    btn.style.background = n===s ? '#1565c0' : '#1a2a3a';
+    btn.style.color       = n===s ? '#fff'    : '#90caf9';
+    btn.style.borderColor = n===s ? '#4fc3f7' : '#334';
+  });
+}
+const AL_COLORS = ['#64b5f6','#ef5350','#66bb6a','#ffd54f','#ce93d8','#ff8a65','#80deea','#f48fb1'];
+let MAP_W = 404, MAP_H = 398, ppc = 3;
+const MIN_PPC = 1, MAX_PPC = 16;
+
+// ── 연맹 상태 ─────────────────────────────────────────
+function makeAlliance(id, name, color, hx, hy) {
+  return { id, name, color, towers:[],
+    helipad:{x:hx, y:hy, r:25},
+    cement:100, towerCount:20, cities6:0, cities7:0, cities8:0,
+    prismCoins:0, coinChaseUsed:0, coinChaseLastUTC:null };
+}
+let alliances = [
+  makeAlliance(0,'A 연맹', AL_COLORS[0],  45,  370),  // SW
+  makeAlliance(1,'B 연맹', AL_COLORS[1], 202,  370),  // S
+  makeAlliance(2,'C 연맹', AL_COLORS[2], 360,  370),  // SE
+  makeAlliance(3,'D 연맹', AL_COLORS[3], 360,  199),  // E
+  makeAlliance(4,'E 연맹', AL_COLORS[4], 360,   25),  // NE
+  makeAlliance(5,'F 연맹', AL_COLORS[5], 202,   25),  // N
+  makeAlliance(6,'G 연맹', AL_COLORS[6],  45,   25),  // NW
+  makeAlliance(7,'H 연맹', AL_COLORS[7],  45,  199),  // W
+];
+let alIdSeq   = 8;
+let activeIdx = 0;
+let towerMode = 'build'; // 'build' | 'demolish' | 'ignite'
+
+const TOWER_DEFAULTS = { maxHp:7200, burnRatePerSec:5, burnDurationSec:600 };
+
+function setTowerMode(m) {
+  towerMode = m;
+  const cfg = {
+    build:   {id:'tmBuild',  bg:'#1565c0', border:'#4fc3f7'},
+    demolish:{id:'tmDemol',  bg:'#b71c1c', border:'#ef5350'},
+    ignite:  {id:'tmIgnite', bg:'#e65100', border:'#ff9800'}
+  };
+  Object.entries(cfg).forEach(([k,s])=>{
+    const btn=document.getElementById(s.id); if(!btn) return;
+    btn.style.background  = k===m ? s.bg    : '#1a2a3a';
+    btn.style.color       = k===m ? '#fff'  : s.border;
+    btn.style.borderColor = k===m ? s.border: '#334';
+  });
+}
+
+function undoTower() {
+  const al = alliances[activeIdx];
+  if (al && al.towers.length > 0) { al.towers.pop(); draw(); }
+}
+
+// ── 점수 상수 ─────────────────────────────────────────
+const CITY_SCORES = { 6: 100000, 7: 300000, 8: 600000 };
+
+function calcScore(alIdx) {
+  const al = alliances[alIdx];
+  const cityScore = cities.reduce((s, c) => s + (c.owner === alIdx ? CITY_SCORES[c.level] : 0), 0);
+  const prism = (al.prismCoins || 0) * 1000;
+  return { cityScore, prism, total: cityScore + prism };
+}
+
+function getRanking() {
+  return alliances
+    .map((al, i) => ({ al, i, ...calcScore(i) }))
+    .sort((a, b) => b.total - a.total);
+}
+
+// ── 도시 상태 ─────────────────────────────────────────
+let cities = [
+  { id:0, level:6, label:'6도시', color:'#aed581', x:100, y:100, r:20, owner:null },
+  { id:1, level:7, label:'7도시', color:'#ffd54f', x:200, y:200, r:25, owner:null, prism:450 },
+  { id:2, level:8, label:'8도시', color:'#ff8a65', x:300, y:300, r:30, owner:null }
+];
+let cityIdSeq = 3;
+
+// ── 캔버스 ────────────────────────────────────────────
+const canvas  = document.getElementById('map');
+const mapWrap = document.getElementById('mapWrap');
+const ctx     = canvas.getContext('2d');
+function resizeCanvas(){ canvas.width = MAP_W*ppc; canvas.height = MAP_H*ppc; }
+
+// ── 좌표 ──────────────────────────────────────────────
+const toC    = (x,y) => ({cx:x*ppc, cy:(MAP_H-y)*ppc});
+const fromC  = (px,py) => ({x:px/ppc, y:MAP_H-py/ppc});
+const clamp  = (v,lo,hi) => Math.max(lo,Math.min(hi,v));
+// 타워 배치 스냅: topLeft이 snapMode 단위로 정렬 → center = topLeft + 4
+const snapTower = v => Math.round((v - 4) / snapMode) * snapMode + 4;
+const snapPos   = (x, y) => ({
+  x: clamp(snapTower(x), 4, MAP_W - 5),
+  y: clamp(snapTower(y), 4, MAP_H - 5)
+});
+
+// 영토 드래그 스냅: 중심이 snapMode 단위로 정렬
+const snapDrag = v => Math.round(v / snapMode) * snapMode;
+const isConn = (a,b) => Math.max(0,Math.abs(b.x-a.x)-TS)<=GAP && Math.max(0,Math.abs(b.y-a.y)-TS)<=GAP;
+const fmtK   = v => (v/1000).toFixed(1)+'k';
+const fmtT   = m => { const h=Math.floor(m/60),mn=Math.round(m%60); return h>0?`${h}h ${mn}m`:`${mn}m`; };
+const G      = id => +document.getElementById(id).value;
+
+// ── 드래그 ────────────────────────────────────────────
+let drag={}, isDragging=false;
+
+// ── 동맹 관계 ─────────────────────────────────────────
+let relations = {};
+function relKey(i,j){ return i<j?`${i}-${j}`:`${j}-${i}`; }
+function getRel(i,j){ return relations[relKey(i,j)]||'neutral'; }
+function setRel(i,j,v){ relations[relKey(i,j)]=v; renderRelTab(); draw(); }
+
+// ── UTC 시간 ──────────────────────────────────────────
+let simTime = null;
+function getSimTime(){ return simTime ? new Date(simTime) : new Date(); }
+function syncUTC(){ simTime=null; document.getElementById('simTimeInput').value=''; renderEvtTab(); }
+function setSimTime(v){ simTime=v?new Date(v+'Z'):null; renderEvtTab(); }
+function clearSimTime(){ simTime=null; document.getElementById('simTimeInput').value=''; renderEvtTab(); }
+
+// ── 전소 타워 목록 ────────────────────────────────────
+let burnTowers=[], burnIdSeq=0;
+
+function hitTest(gx,gy) {
+  for (let i=0;i<alliances.length;i++) {
+    const h=alliances[i].helipad;
+    if (Math.abs(gx-h.x)<=h.r && Math.abs(gy-h.y)<=h.r) return {type:'helipad',idx:i};
+  }
+  for (let i=0;i<cities.length;i++) {
+    const c=cities[i];
+    if (Math.abs(gx-c.x)<=c.r && Math.abs(gy-c.y)<=c.r) return {type:'city',idx:i};
+  }
+  return null;
+}
+
+// ── 그리기 ────────────────────────────────────────────
+function draw() {
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.fillStyle='#0a0f1a'; ctx.fillRect(0,0,canvas.width,canvas.height);
+  drawGrid();
+  // 헬기장
+  alliances.forEach(al => drawRect(al.helipad.x,al.helipad.y,al.helipad.r,al.color,'🚁',al.name));
+  // 도시 (점령 연맹 색상 + 연결 여부 표시)
+  cities.forEach((c,ci) => {
+    const connAlliances = alliances.filter(al => {
+      const towers = al.towers.length>0 ? al.towers : [{x:al.helipad.x,y:al.helipad.y}];
+      const s = new Set(); getConnectedCities(towers).forEach(id=>s.add(id));
+      return s.has(ci);
+    });
+    const owner = c.owner!=null ? alliances[c.owner] : null;
+    const displayColor = owner ? owner.color : c.color;
+    drawRect(c.x,c.y,c.r,displayColor,cityEmoji(c.level),c.label,connAlliances,owner);
+  });
+  // 타워
+  alliances.forEach(al => drawBlocks(al.towers, al.color));
+  if (ghost) drawGhost();
+}
+
+function drawGrid() {
+  for (let x=0;x<=MAP_W;x++) {
+    const px=x*ppc;
+    ctx.strokeStyle=x%TS===0?'#1e3060':x%3===0?'#131c30':'#0d1420';
+    ctx.lineWidth=x%TS===0?.8:.4;
+    ctx.beginPath();ctx.moveTo(px,0);ctx.lineTo(px,canvas.height);ctx.stroke();
+  }
+  for (let y=0;y<=MAP_H;y++) {
+    const py=y*ppc;
+    ctx.strokeStyle=y%TS===0?'#1e3060':y%3===0?'#131c30':'#0d1420';
+    ctx.lineWidth=y%TS===0?.8:.4;
+    ctx.beginPath();ctx.moveTo(0,py);ctx.lineTo(canvas.width,py);ctx.stroke();
+  }
+  if (ppc>=2) {
+    ctx.fillStyle='#2a3a5a'; ctx.font=`${Math.max(8,ppc*2.5)}px sans-serif`;
+    ctx.textAlign='left'; ctx.textBaseline='top';
+    for (let x=50;x<=MAP_W;x+=50){const{cx}=toC(x,MAP_H);ctx.fillText(x,cx+1,1);}
+    ctx.textAlign='right';
+    for (let y=50;y<=MAP_H;y+=50){const{cy}=toC(0,y);ctx.fillText(y,canvas.width-1,cy+1);}
+  }
+}
+
+function cityEmoji(lv){return lv===6?'6️⃣':lv===7?'7️⃣':'8️⃣';}
+
+function drawRect(x,y,r,color,emoji,label,connAlliances=[],owner=null){
+  const {cx,cy}=toC(x,y), rpx=r*ppc;
+  const isOwned = owner!=null;
+  const isConn  = connAlliances.length>0;
+
+  // 배경 (점령 시 더 진하게)
+  ctx.fillStyle = isOwned ? color+'55' : isConn ? color+'30' : color+'18';
+  ctx.fillRect(cx-rpx,cy-rpx,rpx*2,rpx*2);
+
+  // 테두리 (점령 시 굵게)
+  ctx.strokeStyle = color+(isOwned?'ff':isConn?'cc':'55');
+  ctx.lineWidth   = isOwned ? 2.5 : isConn ? 1.5 : 1;
+  ctx.strokeRect(cx-rpx,cy-rpx,rpx*2,rpx*2);
+
+  // 점령 연맹 이름 배지
+  if (isOwned && ppc>=2) {
+    const bw = Math.min(rpx*1.6, ppc*14);
+    ctx.fillStyle = owner.color+'cc';
+    ctx.fillRect(cx-bw/2, cy-rpx-ppc*3, bw, ppc*3);
+    ctx.fillStyle = '#fff';
+    ctx.font = `bold ${Math.max(6,ppc*1.8)}px sans-serif`;
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(owner.name, cx, cy-rpx-ppc*1.5);
+  }
+
+  // 연결 연맹 색상 점
+  if (isConn && !isOwned) {
+    connAlliances.forEach((al,i)=>{
+      ctx.fillStyle=al.color;
+      ctx.beginPath();
+      ctx.arc(cx-rpx+ppc*2+i*ppc*3.5, cy-rpx-ppc*1.5, ppc*1.2, 0, Math.PI*2);
+      ctx.fill();
+    });
+  }
+
+  if (ppc>=2){
+    ctx.font=`${Math.max(10,rpx*.7)}px sans-serif`;
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillStyle=color+(isOwned?'ff':'aa');
+    ctx.fillText(emoji,cx,cy);
+    ctx.fillStyle=color;
+    ctx.font=`bold ${Math.max(7,ppc*2.2)}px sans-serif`;
+    ctx.fillText(label,cx,cy+rpx+ppc*2.5);
+  }
+}
+
+function drawBlocks(towers, color){
+  towers.forEach((t,i)=>{
+    const {cx,cy}=toC(t.x,t.y), s=TS*ppc, b3=3*ppc;
+    if (i>0){
+      const prev=towers[i-1], {cx:px,cy:py}=toC(prev.x,prev.y), ok=isConn(prev,t);
+      ctx.strokeStyle=ok?color+'99':'#ff5722'; ctx.lineWidth=ok?1.5:2;
+      ctx.setLineDash(ok?[]:[4,3]);
+      ctx.beginPath();ctx.moveTo(px,py);ctx.lineTo(cx,cy);ctx.stroke();
+      ctx.setLineDash([]);
+      if (!ok){
+        ctx.fillStyle='#ff5722'; ctx.font=`bold ${ppc*4}px sans-serif`;
+        ctx.textAlign='center'; ctx.textBaseline='middle';
+        ctx.fillText('⚠',(px+cx)/2,(py+cy)/2-ppc*3);
+      }
+    }
+    // 점화 상태 계산
+    const isBurning=t.status==='burning';
+    const burnElapsed=isBurning?(Date.now()-(t.burnStart||0))/1000:0;
+    const hpLeft=isBurning?Math.max(0,(t.hp||TOWER_DEFAULTS.maxHp)-(t.burnRatePerSec||5)*burnElapsed):(t.hp||TOWER_DEFAULTS.maxHp);
+    const hpRatio=hpLeft/(t.maxHp||TOWER_DEFAULTS.maxHp);
+    if(isBurning&&hpLeft<=0&&t.status!=='destroyed'){ t.status='destroyed'; }
+
+    const blockColor=isBurning?'#ff6d00':t.status==='destroyed'?'#424242':color;
+    ctx.fillStyle=blockColor+(isBurning?'bb':'cc'); ctx.fillRect(cx-s/2,cy-s/2,s,s);
+    ctx.strokeStyle=isBurning?'#ff9800':t.status==='destroyed'?'#616161':color;
+    ctx.lineWidth=1.5; ctx.strokeRect(cx-s/2,cy-s/2,s,s);
+    if(isBurning){
+      ctx.fillStyle='#333'; ctx.fillRect(cx-s/2,cy+s/2+1,s,ppc*1.5);
+      ctx.fillStyle=hpRatio>0.5?'#81c784':'#ff9800';
+      ctx.fillRect(cx-s/2,cy+s/2+1,s*hpRatio,ppc*1.5);
+    }
+    ctx.strokeStyle='#ffffff22'; ctx.lineWidth=.5;
+    for(let g=1;g<3;g++){
+      const ox=cx-s/2+b3*g,oy=cy-s/2+b3*g;
+      ctx.beginPath();ctx.moveTo(ox,cy-s/2);ctx.lineTo(ox,cy+s/2);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(cx-s/2,oy);ctx.lineTo(cx+s/2,oy);ctx.stroke();
+    }
+    ctx.strokeStyle=color+'dd'; ctx.lineWidth=1;
+    ctx.beginPath();ctx.arc(cx,cy,b3*.8,0,Math.PI*2);ctx.stroke();
+    ctx.fillStyle='#fff'; ctx.font=`bold ${b3*1.1}px sans-serif`;
+    ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(i+1,cx,cy);
+  });
+}
+
+let ghost=null;
+function drawGhost(){
+  const al=alliances[activeIdx]; if(!al) return;
+  const {cx,cy}=toC(ghost.x,ghost.y), s=TS*ppc;
+  ctx.fillStyle=al.color+'18'; ctx.strokeStyle=al.color+'88'; ctx.lineWidth=1.5;
+  ctx.setLineDash([3,3]); ctx.fillRect(cx-s/2,cy-s/2,s,s); ctx.strokeRect(cx-s/2,cy-s/2,s,s);
+  ctx.setLineDash([]);
+}
+
+// ── 이벤트 ────────────────────────────────────────────
+function getRaw(e){const r=canvas.getBoundingClientRect();return fromC(e.clientX-r.left,e.clientY-r.top);}
+function getSnapped(e){const raw=getRaw(e);return snapPos(raw.x,raw.y);}
+
+canvas.addEventListener('mousedown',e=>{
+  if(e.button!==0) return;
+  const raw=getRaw(e), hit=hitTest(raw.x,raw.y);
+  if(hit){
+    const obj=hit.type==='helipad'?alliances[hit.idx].helipad:cities[hit.idx];
+    drag={...hit,offX:raw.x-obj.x,offY:raw.y-obj.y}; isDragging=false;
+    canvas.style.cursor='grabbing';
+  }
+});
+
+canvas.addEventListener('mousemove',e=>{
+  const raw=getRaw(e);
+  if(drag.type){
+    isDragging=true;
+    const obj=drag.type==='helipad'?alliances[drag.idx].helipad:cities[drag.idx];
+    obj.x=clamp(snapDrag(raw.x-drag.offX),obj.r,MAP_W-obj.r);
+    obj.y=clamp(snapDrag(raw.y-drag.offY),obj.r,MAP_H-obj.r);
+    renderCfgTab(); renderCityList(); ghost=null;
+  } else {
+    const hit=hitTest(raw.x,raw.y);
+    canvas.style.cursor=hit?'grab':'crosshair';
+    ghost=getSnapped(e);
+  }
+  const g=ghost||getSnapped(e);
+  document.getElementById('posBar').textContent=`좌표: (${g.x}, ${g.y})`;
+  draw();
+});
+
+canvas.addEventListener('mouseup',e=>{
+  if(e.button!==0) return;
+  const wasDrag=isDragging; drag={}; isDragging=false; canvas.style.cursor='crosshair';
+  if(!wasDrag){
+    const raw=getRaw(e);
+    if(!hitTest(raw.x,raw.y)){
+      const g=getSnapped(e);
+      const al=alliances[activeIdx]; if(!al) return;
+      if(towerMode==='build'){
+        al.towers.push({x:g.x,y:g.y,status:'built',
+          hp:G('tTowerHp')||TOWER_DEFAULTS.maxHp,
+          maxHp:G('tTowerHp')||TOWER_DEFAULTS.maxHp});
+      } else if(towerMode==='demolish'){
+        // 가장 가까운 타워 철거 (해당 연맹)
+        const idx=findNearestTower(al.towers,g.x,g.y);
+        if(idx>=0){
+          const t=al.towers[idx];
+          const cost=getTowerCost(al.towerCount+idx+1);
+          al.cement=+(al.cement+(cost/1000)*0.5).toFixed(1); // 50% 반환
+          al.towers.splice(idx,1);
+          renderCfgTab();
+        }
+      } else if(towerMode==='ignite'){
+        const idx=findNearestTower(al.towers,g.x,g.y);
+        if(idx>=0){
+          al.towers[idx].status='burning';
+          al.towers[idx].burnStart=Date.now();
+          al.towers[idx].burnRatePerSec=G('tBurnRate')||TOWER_DEFAULTS.burnRatePerSec;
+          al.towers[idx].burnDurationSec=TOWER_DEFAULTS.burnDurationSec;
+        }
+      }
+    }
+  }
+  draw();
+});
+
+canvas.addEventListener('mouseleave',()=>{drag={};isDragging=false;ghost=null;canvas.style.cursor='crosshair';draw();});
+canvas.addEventListener('contextmenu',e=>e.preventDefault());
+
+mapWrap.addEventListener('wheel',e=>{
+  e.preventDefault();
+  const rect=mapWrap.getBoundingClientRect();
+  const mx=e.clientX-rect.left+mapWrap.scrollLeft, my=e.clientY-rect.top+mapWrap.scrollTop;
+  const rx=mx/canvas.width, ry=my/canvas.height;
+  const np=Math.max(MIN_PPC,Math.min(MAX_PPC,ppc+(e.deltaY<0?1:-1)));
+  if(np===ppc) return;
+  ppc=np; resizeCanvas(); draw();
+  mapWrap.scrollLeft=rx*canvas.width-(e.clientX-rect.left);
+  mapWrap.scrollTop=ry*canvas.height-(e.clientY-rect.top);
+},{passive:false});
+
+// ── 연맹 관리 ─────────────────────────────────────────
+function addAlliance(){
+  if(alliances.length>=8){alert('최대 8개');return;}
+  const color=AL_COLORS[alliances.length%AL_COLORS.length];
+  const letter=String.fromCharCode(65+alliances.length);
+  alliances.push({id:alIdSeq++,name:`${letter} 연맹`,color,towers:[],
+    helipad:{x:50+alliances.length*40,y:50,r:30},
+    cement:100, towerCount:20, cities6:1, cities7:0, cities8:0,
+    prismCoins:0, coinChaseUsed:0, coinChaseLastUTC:null});
+  renderAllianceBtns(); renderCfgTab(); draw();
+}
+
+function removeAlliance(idx){
+  if(alliances.length<=1){alert('최소 1개 필요');return;}
+  alliances.splice(idx,1);
+  if(activeIdx>=alliances.length) activeIdx=alliances.length-1;
+  renderAllianceBtns(); renderCfgTab(); draw();
+}
+
+function setActive(idx){ activeIdx=idx; renderAllianceBtns(); }
+
+function renderAllianceBtns(){
+  document.getElementById('allianceBtns').innerHTML=alliances.map((al,i)=>`
+    <button class="al-btn${i===activeIdx?' active':''}"
+      style="background:${al.color}33;border-color:${al.color};color:${i===activeIdx?'#fff':al.color}"
+      onclick="setActive(${i})">
+      ${al.name}
+      <span class="al-rm" onclick="event.stopPropagation();removeAlliance(${i})">✕</span>
+    </button>`).join('');
+}
+
+function renderCfgTab(){
+  document.getElementById('allianceCfgList').innerHTML=alliances.map((al,i)=>`
+    <div class="al-card" style="border-left-color:${al.color}">
+      <div class="al-card-hdr">
+        <span class="al-dot" style="background:${al.color}"></span>
+        <input class="al-name-input" value="${al.name}" oninput="alliances[${i}].name=this.value;renderAllianceBtns()">
+        <button class="rm-btn" onclick="removeAlliance(${i})">제거</button>
+      </div>
+      <div class="duo">
+        <div class="row"><label>현재 시멘트<span class="suffix">(k)</span></label>
+          <input type="number" value="${al.cement}" oninput="alliances[${i}].cement=+this.value"></div>
+        <div class="row"><label>현재 타워 수</label>
+          <input type="number" value="${al.towerCount}" oninput="alliances[${i}].towerCount=+this.value;renderCfgTab()"></div>
+      </div>
+      ${(()=>{
+        const conn=getConnectedCities(al.towers.length>0?al.towers:[{x:al.helipad.x,y:al.helipad.y}]);
+        const prod=calcProdFromSet(conn);
+        const cityLabels=[...conn].map(ci=>cities[ci]?.label||'').filter(Boolean).join(', ')||'없음';
+        return `<div style="font-size:.7rem;background:#0d1b2e;border-radius:3px;padding:5px 7px;margin-bottom:6px;line-height:1.6">
+          🏙 연결 도시: <span style="color:#ffd54f">${cityLabels}</span><br>
+          📦 분당 생산량: <strong style="color:#90caf9">${prod}/분</strong>
+          &nbsp;│&nbsp; 다음 탑 비용: <strong style="color:#ef9a9a">${getTowerCost(al.towerCount+1).toLocaleString()}</strong>
+        </div>`;
+      })()}
+      <div class="duo">
+        <div class="row"><label>라인끝 X</label>
+          <input type="number" value="${al.helipad.x}" oninput="alliances[${i}].helipad.x=+this.value;draw()"></div>
+        <div class="row"><label>라인끝 Y</label>
+          <input type="number" value="${al.helipad.y}" oninput="alliances[${i}].helipad.y=+this.value;draw()"></div>
+      </div>
+      <div class="row"><label>헬기장 반경</label>
+        <input type="number" value="${al.helipad.r}" oninput="alliances[${i}].helipad.r=+this.value;draw()"></div>
+    </div>`).join('');
+}
+
+// ── 도시 관리 ─────────────────────────────────────────
+const CITY_COLORS={6:'#aed581',7:'#ffd54f',8:'#ff8a65'};
+
+function addCity(){
+  cities.push({id:cityIdSeq++,level:6,label:'6도시',color:'#aed581',x:200,y:200,r:20,owner:null});
+  renderCityList(); draw();
+}
+
+function removeCity(idx){
+  cities.splice(idx,1); renderCityList(); draw();
+}
+
+function renderCityList(){
+  document.getElementById('cityList').innerHTML=cities.map((c,i)=>`
+    <div class="city-item" style="border-left-color:${c.color}">
+      <div class="city-hdr">
+        <select onchange="cities[${i}].level=+this.value;cities[${i}].color=CITY_COLORS[+this.value];renderCityList();draw()">
+          ${[6,7,8].map(lv=>`<option value="${lv}"${c.level===lv?' selected':''}>${lv}도시</option>`).join('')}
+        </select>
+        <input class="city-name-input" value="${c.label}" oninput="cities[${i}].label=this.value;draw()">
+        <button class="rm-btn" onclick="removeCity(${i})">✕</button>
+      </div>
+      <div class="trio">
+        <div class="row"><label>X</label><input type="number" value="${c.x}" oninput="cities[${i}].x=+this.value;draw()"></div>
+        <div class="row"><label>Y</label><input type="number" value="${c.y}" oninput="cities[${i}].y=+this.value;draw()"></div>
+        <div class="row"><label>반경</label><input type="number" value="${c.r}" oninput="cities[${i}].r=+this.value;draw()"></div>
+      </div>
+    </div>`).join('');
+}
+
+// ── 템플릿 ────────────────────────────────────────────
+function applyTemplate(){
+  MAP_W=G('tMapW'); MAP_H=G('tMapH');
+  resizeCanvas(); draw();
+}
+
+function saveTemplate(){
+  const data={mapW:MAP_W,mapH:MAP_H,tower:{buildMin:G('tBuildMin'),burnMin:G('tBurnMin'),baseCost:G('tBaseCost'),costInc:G('tCostInc')},alliances,cities};
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));
+  a.download='war_map_template.json'; a.click();
+}
+
+function loadTemplate(e){
+  const file=e.target.files[0]; if(!file) return;
+  const reader=new FileReader();
+  reader.onload=ev=>{
+    try{
+      const d=JSON.parse(ev.target.result);
+      MAP_W=d.mapW||404; MAP_H=d.mapH||398;
+      document.getElementById('tMapW').value=MAP_W;
+      document.getElementById('tMapH').value=MAP_H;
+      if(d.tower){document.getElementById('tBuildMin').value=d.tower.buildMin;document.getElementById('tBurnMin').value=d.tower.burnMin;document.getElementById('tBaseCost').value=d.tower.baseCost;document.getElementById('tCostInc').value=d.tower.costInc;}
+      if(d.alliances){alliances=d.alliances;activeIdx=0;}
+      if(d.cities) cities=d.cities;
+      renderAllianceBtns(); renderCfgTab(); renderCityList(); resizeCanvas(); draw();
+    }catch{alert('파일 로드 실패');}
+  };
+  reader.readAsText(file); e.target.value='';
+}
+
+// ── 계산 ──────────────────────────────────────────────
+// cem: k 단위, buildMin: 분, startTowerCount: 현재 보유 탑 수
+// 도시 연결은 자동 감지 → 생산량 동적 증가
+function calcPath(sx,sy,tx,ty,cem,buildMin,startTowerCount){
+  const d=Math.sqrt((tx-sx)**2+(ty-sy)**2), n=Math.ceil(d/(TS+GAP));
+  const towers=[]; let c=cem*1000, total=0;
+  const conn=new Set(); // 연결된 도시 인덱스
+  // 헬기장은 처음부터 연결 (sx,sy = 헬기장 위치)
+  checkCityConn(sx, sy, conn);
+  for(let i=0;i<n;i++){
+    const t=(i+1)/n, x=Math.round(sx+(tx-sx)*t), y=Math.round(sy+(ty-sy)*t);
+    const newC=checkCityConn(x,y,conn);
+    const p=calcProdFromSet(conn);
+    const cost=getTowerCost(startTowerCount+i+1);
+    const ca=c+p*buildMin, wait=Math.max(0,cost-ca)/p;
+    total+=buildMin+wait; c=ca-cost+p*wait;
+    towers.push({num:startTowerCount+i+1,x,y,cost,wait,total,cem:c,prod:p,newCities:newC});
+  }
+  return {towers,total};
+}
+
+function calcFromPlaced(placed,cem,buildMin,startTowerCount,startX,startY){
+  let c=cem*1000, total=0;
+  const conn=new Set();
+  checkCityConn(startX,startY,conn);
+  const towers=placed.map((pt,i)=>{
+    const newC=checkCityConn(pt.x,pt.y,conn);
+    const p=calcProdFromSet(conn);
+    const cost=getTowerCost(startTowerCount+i+1);
+    const ca=c+p*buildMin, wait=Math.max(0,cost-ca)/p;
+    total+=buildMin+wait; c=ca-cost+p*wait;
+    return {num:startTowerCount+i+1,x:pt.x,y:pt.y,cost,wait,total,cem:c,prod:p,newCities:newC};
+  });
+  return {towers,total};
+}
+
+function runSim(){
+  const tx=G('tgtX'),ty=G('tgtY'),bm=G('tBuildMin');
+  const results=alliances.map(al=>{
+    const res=al.towers.length>0
+      ?calcFromPlaced(al.towers,al.cement,bm,al.towerCount,al.helipad.x,al.helipad.y)
+      :calcPath(al.helipad.x,al.helipad.y,tx,ty,al.cement,bm,al.towerCount);
+    return {al,res};
+  });
+  const sorted=[...results].sort((a,b)=>a.res.total-b.res.total);
+  const fastest=sorted[0];
+
+  let html='';
+  results.forEach(({al,res})=>{
+    const isFastest=res.total===fastest.res.total;
+    const diff=Math.abs(res.total-fastest.res.total);
+    html+=`<div class="card" style="border-left:3px solid ${al.color}">
+      <div style="font-size:.78rem;font-weight:700;color:${al.color};margin-bottom:4px">${al.name}</div>
+      <div class="card-row"><span>도달 시간</span><span style="color:${al.color};font-weight:700">${fmtT(res.total)}</span></div>
+      ${!isFastest?`<div class="card-row"><span>차이</span><span style="color:#ff9800">+${fmtT(diff)}</span></div>`:''}
+      <span class="badge ${isFastest?'win':'lose'}">${isFastest?'🥇 가장 빠름':`${sorted.indexOf({al,res})+1}위`}</span>
+    </div>
+    <details style="margin-bottom:8px;font-size:.68rem">
+      <summary style="color:#666;cursor:pointer;padding:2px 4px">타워 상세 ▾</summary>
+      ${renderTableStr(res.towers)}
+    </details>`;
+  });
+
+  document.getElementById('resultCards').innerHTML=html;
+  showTab('res',document.querySelectorAll('.tab')[2]);
+}
+
+function renderTableStr(towers){
+  if(!towers.length) return '<p style="color:#444">자동 경로</p>';
+  return `<table><thead><tr><th>#</th><th>좌표</th><th>비용</th><th>생산</th><th>대기</th><th>완료</th></tr></thead><tbody>`+
+    towers.map(t=>{
+      const cityEvent = t.newCities&&t.newCities.length>0
+        ? `<br><span style="color:#ffd54f;font-size:.62rem">🏙 ${t.newCities.map(ci=>cities[ci]?.label||'').join(',')}</span>`:'';
+      return `<tr>
+        <td>${t.num}</td>
+        <td>(${t.x},${t.y})${cityEvent}</td>
+        <td>${fmtK(t.cost)}</td>
+        <td style="color:#90caf9">${t.prod}</td>
+        <td>${t.wait>0?`<span class="warn">+${Math.round(t.wait)}분</span>`:'<span class="ok">즉시</span>'}</td>
+        <td>${fmtT(t.total)}</td>
+      </tr>`;
+    }).join('')+`</tbody></table>`;
+}
+
+function resetTowers(){ alliances.forEach(al=>al.towers=[]); draw(); }
+
+function findNearestTower(towers, x, y) {
+  let best=-1, bestD=Infinity;
+  towers.forEach((t,i)=>{ const d=Math.abs(t.x-x)+Math.abs(t.y-y); if(d<bestD){bestD=d;best=i;} });
+  return bestD <= TS*3 ? best : -1; // 3타워 반경 이내
+}
+
+// ── 동맹 관계 탭 ──────────────────────────────────────
+function renderRelTab(){
+  const REL = {ally:{icon:'🟢',label:'동맹',color:'#2e7d32'},
+               neutral:{icon:'⚪',label:'중립',color:'#555'},
+               enemy:{icon:'🔴',label:'적대',color:'#7f0000'}};
+  let html='';
+  for(let i=0;i<alliances.length;i++){
+    for(let j=i+1;j<alliances.length;j++){
+      const r=getRel(i,j), ri=REL[r];
+      html+=`<div style="display:flex;align-items:center;gap:5px;margin-bottom:5px;background:#0d1825;border-radius:4px;padding:5px 7px">
+        <span style="font-size:.7rem;color:${alliances[i].color};min-width:45px">${alliances[i].name}</span>
+        <span style="font-size:.65rem;color:#444">vs</span>
+        <span style="font-size:.7rem;color:${alliances[j].color};min-width:45px">${alliances[j].name}</span>
+        <div style="display:flex;gap:3px;margin-left:auto">
+          ${Object.entries(REL).map(([k,v])=>`
+            <button onclick="setRel(${i},${j},'${k}')"
+              style="padding:2px 5px;border:1px solid ${r===k?v.color:'#333'};border-radius:3px;
+                     background:${r===k?v.color+'33':'#0d1020'};color:${r===k?'#fff':'#666'};
+                     font-size:.65rem;cursor:pointer">${v.icon}</button>`).join('')}
+        </div>
+      </div>`;
+    }
+  }
+  document.getElementById('relMatrix').innerHTML=html||'<p style="color:#444;font-size:.72rem">연맹을 2개 이상 추가하세요.</p>';
+
+  // 진영 합산 점수
+  const teamScores = alliances.map((_,i)=>{
+    const allies = alliances.filter((_,j)=>j!==i&&getRel(i,j)==='ally');
+    const total = [i,...allies.map((_,k)=>alliances.indexOf(allies[k]))]
+      .reduce((s,idx)=>s+calcScore(idx).total,0);
+    return {idx:i, allies, total};
+  });
+  const sorted=[...teamScores].sort((a,b)=>b.total-a.total);
+  document.getElementById('relTeamScore').innerHTML=sorted.map((t,rank)=>{
+    const medals=['🥇','🥈','🥉'];
+    const al=alliances[t.idx];
+    const allyNames=t.allies.map(a=>a.name).join(', ')||'없음';
+    return `<div style="background:#0d1825;border-left:3px solid ${al.color};border-radius:4px;padding:6px 8px;margin-bottom:5px">
+      <div style="display:flex;justify-content:space-between">
+        <span style="font-size:.75rem;font-weight:700;color:${al.color}">${medals[rank]||rank+1+'위'} ${al.name}</span>
+        <span style="font-size:.78rem;color:#fff;font-weight:700">${(t.total/10000).toFixed(0)}만점</span>
+      </div>
+      <div style="font-size:.63rem;color:#555;margin-top:2px">동맹: ${allyNames}</div>
+    </div>`;
+  }).join('');
+}
+
+// ── 이벤트 탭 ────────────────────────────────────────
+function renderEvtTab(){
+  const now = getSimTime();
+  const isManual = simTime!==null;
+  const utcStr = now.toUTCString().replace(' GMT','');
+
+  // 이벤트 시작일 계산
+  const startVal = document.getElementById('eventStartDate')?.value;
+  let dayInfo = '<p style="color:#555;font-size:.72rem">이벤트 시작일(금요일)을 선택하세요.</p>';
+  let coinHtml = '';
+
+  if(startVal){
+    const startFri = new Date(startVal+'T00:00:00Z');
+    const sat = new Date(startFri); sat.setUTCDate(sat.getUTCDate()+1);
+    const sun = new Date(startFri); sun.setUTCDate(sun.getUTCDate()+2);
+    const monEnd = new Date(startFri); monEnd.setUTCDate(monEnd.getUTCDate()+3);
+
+    const diff = now-startFri;
+    let day=0, dayLabel='', openCities=[], coinAvail=false;
+    if(diff<0){ dayLabel='⏳ 이벤트 시작 전'; openCities=[]; }
+    else if(now<sat){ day=1; dayLabel='📅 1일차 (금요일)'; openCities=['6도시']; }
+    else if(now<sun){ day=2; dayLabel='📅 2일차 (토요일)'; openCities=['6도시','7도시'];
+      const coinStart=new Date(sat); coinStart.setUTCMinutes(30);
+      coinAvail = now>=coinStart && now<=new Date(sat.toISOString().slice(0,10)+'T23:59:59Z');
+    }
+    else if(now<monEnd){ day=3; dayLabel='📅 3일차 (일요일)'; openCities=['6도시','7도시','8도시']; }
+    else { dayLabel='🏁 이벤트 종료'; openCities=[]; }
+
+    const remain = day>0&&day<4 ? (() => {
+      const end = day===1?sat:day===2?sun:monEnd;
+      const ms = end-now;
+      const h=Math.floor(ms/3600000), m=Math.floor((ms%3600000)/60000);
+      return `${h}시간 ${m}분 후 다음 단계`;
+    })() : '';
+
+    dayInfo=`
+      <div style="background:#0d1825;border-radius:5px;padding:9px;margin-bottom:8px">
+        <div style="font-size:.85rem;font-weight:700;color:#4fc3f7;margin-bottom:5px">${dayLabel}</div>
+        ${remain?`<div style="font-size:.68rem;color:#666;margin-bottom:5px">${remain}</div>`:''}
+        <div style="font-size:.72rem;color:#aed581">개방 도시: ${openCities.join(', ')||'없음'}</div>
+        ${day===2?`<div style="font-size:.72rem;margin-top:4px;color:${coinAvail?'#ffd54f':'#555'}">
+          💎 코인추격: ${coinAvail?'✅ 가능 (UTC 00:30~23:59)':'⏸ 불가'}</div>`:''}
+      </div>`;
+
+    // 코인추격 현황
+    coinHtml='<div style="font-size:.68rem;color:#666;margin-bottom:6px">각 연맹의 코인추격 사용 현황 (토요일만 활성)</div>';
+    coinHtml+=alliances.map((al,i)=>{
+      const used = al.coinChaseUsed||0;
+      const lastUse = al.coinChaseLastUTC ? new Date(al.coinChaseLastUTC) : null;
+      const coolEnd = lastUse ? new Date(lastUse.getTime()+12*3600000) : null;
+      const onCooldown = coolEnd && now<coolEnd;
+      const remainMin = onCooldown ? Math.ceil((coolEnd-now)/60000) : 0;
+      return `<div style="background:#0d1825;border-left:3px solid ${al.color};border-radius:4px;padding:6px 8px;margin-bottom:5px">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span style="font-size:.73rem;color:${al.color};font-weight:700">${al.name}</span>
+          <span style="font-size:.7rem;color:${used>=2?'#ef5350':used===1?'#ffd54f':'#81c784'}">
+            ${used}/2회 사용
+          </span>
+        </div>
+        ${onCooldown?`<div style="font-size:.65rem;color:#ff9800;margin-top:2px">⏳ 쿨타임 ${Math.floor(remainMin/60)}시간 ${remainMin%60}분 남음</div>`:''}
+        ${used<2&&!onCooldown&&day===2&&coinAvail?`<div style="font-size:.65rem;color:#81c784;margin-top:2px">✅ 사용 가능</div>`:''}
+        <div style="display:flex;gap:4px;margin-top:5px">
+          <button class="btn" style="flex:1;padding:3px;font-size:.65rem;background:#1a3a1a;color:#81c784"
+            onclick="useCoinChase(${i})">코인추격 사용</button>
+          <button class="btn" style="padding:3px 6px;font-size:.65rem;background:#1a1a2e;color:#666"
+            onclick="resetCoinChase(${i})">초기화</button>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  document.getElementById('evtStatus').innerHTML=dayInfo;
+  document.getElementById('coinChaseStatus').innerHTML=coinHtml;
+}
+
+function useCoinChase(idx){
+  const al=alliances[idx];
+  if((al.coinChaseUsed||0)>=2){alert('이미 2회 모두 사용했습니다.');return;}
+  const now=getSimTime();
+  const lastUse=al.coinChaseLastUTC?new Date(al.coinChaseLastUTC):null;
+  if(lastUse&&now-lastUse<12*3600000){
+    const rem=Math.ceil((12*3600000-(now-lastUse))/60000);
+    alert(`쿨타임 중: ${Math.floor(rem/60)}시간 ${rem%60}분 남음`);return;
+  }
+  al.coinChaseUsed=(al.coinChaseUsed||0)+1;
+  al.coinChaseLastUTC=now.toISOString();
+  al.prismCoins=(al.prismCoins||0)+90;
+  renderEvtTab(); renderOcpTab();
+}
+function resetCoinChase(idx){ alliances[idx].coinChaseUsed=0; alliances[idx].coinChaseLastUTC=null; renderEvtTab(); }
+
+// ── 전소 계산 탭 ─────────────────────────────────────
+function addBurnTower(){
+  burnTowers.push({id:burnIdSeq++,label:`타워 ${burnIdSeq}`,hp:100000,maxHp:100000,dmgPerMin:5000,repairPerMin:0});
+  renderBurnTab();
+}
+function removeBurnTower(id){ burnTowers=burnTowers.filter(t=>t.id!==id); renderBurnTab(); }
+
+function renderBurnTab(){
+  document.getElementById('burnList').innerHTML=burnTowers.map((t,i)=>`
+    <div style="background:#0d1825;border-left:3px solid #ef5350;border-radius:5px;padding:7px;margin-bottom:7px">
+      <div style="display:flex;align-items:center;gap:5px;margin-bottom:5px">
+        <input value="${t.label}" style="flex:1;background:transparent;border:none;border-bottom:1px solid #334;color:#eee;font-size:.78rem;padding:1px 3px"
+          oninput="burnTowers[${i}].label=this.value">
+        <button class="rm-btn" onclick="removeBurnTower(${t.id})">✕</button>
+      </div>
+      <div style="display:flex;gap:4px;flex-wrap:wrap">
+        <div class="row" style="flex:1;min-width:80px"><label>현재 HP</label>
+          <input type="number" value="${t.hp}" oninput="burnTowers[${i}].hp=+this.value;renderBurnTab()"></div>
+        <div class="row" style="flex:1;min-width:80px"><label>최대 HP</label>
+          <input type="number" value="${t.maxHp}" oninput="burnTowers[${i}].maxHp=+this.value;renderBurnTab()"></div>
+        <div class="row" style="flex:1;min-width:80px"><label>분당 피해</label>
+          <input type="number" value="${t.dmgPerMin}" oninput="burnTowers[${i}].dmgPerMin=+this.value;renderBurnTab()"></div>
+        <div class="row" style="flex:1;min-width:80px"><label>분당 수리</label>
+          <input type="number" value="${t.repairPerMin}" oninput="burnTowers[${i}].repairPerMin=+this.value;renderBurnTab()"></div>
+      </div>
+    </div>`).join('');
+
+  const now=getSimTime();
+  document.getElementById('burnResults').innerHTML=burnTowers.length===0
+    ? '<p style="color:#444;font-size:.72rem">타워를 추가하세요.</p>'
+    : '<div class="sec">계산 결과</div>'
+      + burnTowers.map(t=>{
+          const net=t.dmgPerMin-t.repairPerMin;
+          if(net<=0) return `<div style="background:#0d1825;border-radius:4px;padding:7px;margin-bottom:5px">
+            <span style="color:#81c784;font-size:.75rem">🛡 ${t.label}: 수리 중 (파괴 없음)</span></div>`;
+          const minLeft=t.hp/net;
+          const destroyAt=new Date(now.getTime()+minLeft*60000);
+          const hLeft=Math.floor(minLeft/60), mLeft=Math.round(minLeft%60);
+          return `<div style="background:#1a0d0d;border-left:3px solid #ef5350;border-radius:4px;padding:7px;margin-bottom:5px">
+            <div style="font-size:.75rem;font-weight:700;color:#ef9a9a">${t.label}</div>
+            <div style="font-size:.72rem;margin-top:3px">
+              <span style="color:#ff9800">⏱ ${hLeft}시간 ${mLeft}분 후 전소</span><br>
+              <span style="color:#666;font-size:.65rem">UTC ${destroyAt.toUTCString().replace(' GMT','')}</span><br>
+              <span style="color:#888;font-size:.65rem">순 피해: ${net.toLocaleString()}/분 | HP ${((t.hp/t.maxHp)*100).toFixed(1)}%</span>
+            </div>
+          </div>`;
+        }).join('');
+}
+
+function showTab(name,el){
+  document.querySelectorAll('.tab-body').forEach(b=>b.classList.remove('show'));
+  const tabId='tab'+name.charAt(0).toUpperCase()+name.slice(1);
+  const tabEl=document.getElementById(tabId);
+  if(tabEl) tabEl.classList.add('show');
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  if(name==='ocp') renderOcpTab();
+  if(name==='rel') renderRelTab();
+  if(name==='evt') renderEvtTab();
+  if(name==='brn') renderBurnTab();
+}
+
+function renderOcpTab(){
+  const alOpts = `<option value="-1">미점령</option>`
+    + alliances.map((al,i)=>`<option value="${i}">${al.name}</option>`).join('');
+
+  // 도시 점령 현황
+  document.getElementById('ocpCityList').innerHTML = cities.map((c,ci)=>`
+    <div class="row" style="display:flex;align-items:center;gap:5px;margin-bottom:5px">
+      <span style="font-size:.75rem;min-width:50px;color:${c.color}">${c.label}</span>
+      <span style="font-size:.68rem;color:#666">${(CITY_SCORES[c.level]/1000).toFixed(0)}만점</span>
+      <select style="flex:1;background:#0d1b2e;border:1px solid #334;border-radius:3px;color:#eee;font-size:.72rem;padding:2px"
+        onchange="cities[${ci}].owner=+this.value===-1?null:+this.value;renderOcpTab();draw()">
+        ${alOpts.replace(`value="${c.owner==='null'||c.owner==null?-1:c.owner}"`,
+          `value="${c.owner==null?-1:c.owner}" selected`)}
+      </select>
+    </div>`).join('');
+
+  // 도시 owner select 수동으로 selected 설정
+  cities.forEach((c,ci)=>{
+    const sel = document.getElementById('ocpCityList')?.querySelectorAll('select')[ci];
+    if(sel) sel.value = c.owner==null ? -1 : c.owner;
+  });
+
+  // 프리즘코인 입력
+  document.getElementById('ocpPrismList').innerHTML = alliances.map((al,i)=>`
+    <div class="row" style="display:flex;align-items:center;gap:5px;margin-bottom:4px">
+      <span class="al-dot" style="background:${al.color};width:8px;height:8px;border-radius:50%;flex-shrink:0"></span>
+      <span style="font-size:.73rem;flex:1">${al.name}</span>
+      <input type="number" value="${al.prismCoins||0}" min="0" step="90"
+        style="width:70px;padding:2px 5px;background:#0d1b2e;border:1px solid #334;border-radius:3px;color:#eee;font-size:.75rem"
+        oninput="alliances[${i}].prismCoins=+this.value;renderOcpTab()">
+      <span style="font-size:.65rem;color:#666">k</span>
+    </div>`).join('');
+
+  // 랭킹
+  const ranking = getRanking();
+  const medals = ['🥇','🥈','🥉'];
+  document.getElementById('ocpRanking').innerHTML = ranking.map((r,rank)=>`
+    <div style="background:#0d1825;border-left:3px solid ${r.al.color};border-radius:4px;padding:6px 8px;margin-bottom:5px">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <span style="font-size:.75rem;font-weight:700;color:${r.al.color}">
+          ${medals[rank]||`${rank+1}위`} ${r.al.name}
+        </span>
+        <span style="font-size:.8rem;font-weight:700;color:#fff">${(r.total/10000).toFixed(0)}만점</span>
+      </div>
+      <div style="font-size:.65rem;color:#666;margin-top:2px">
+        도시 ${(r.cityScore/10000).toFixed(0)}만 + 프리즘 ${(r.prism/10000).toFixed(0)}만
+      </div>
+    </div>`).join('');
+}
+
+// ── 초기화 ────────────────────────────────────────────
+renderAllianceBtns();
+renderCfgTab();
+renderCityList();
+resizeCanvas();
+draw();
+
+// UTC 실시간 클록
+setInterval(()=>{
+  const el = document.getElementById('utcClock');
+  if(!el) return;
+  const now = new Date();
+  const utc = now.toUTCString().replace(/.*?(\d{2}:\d{2}:\d{2}).*/,'$1');
+  el.innerHTML = utc + ' UTC' + (simTime ? ' <span style="color:#ff9800;font-size:.65rem">[예측모드]</span>' : '');
+}, 1000);
+</script>
+</body>
+</html>
