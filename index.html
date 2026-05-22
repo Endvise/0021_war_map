@@ -1779,6 +1779,41 @@ function showPreviewTooltip(pt,clientX,clientY){
   el.style.top=(clientY+8)+'px';
   el.style.display='block';
 }
+// 수동 예측 타워 호버 툴팁
+function showManualPreviewTooltip(pt,clientX,clientY){
+  let el=document.getElementById('previewTooltip');
+  if(!el){
+    el=document.createElement('div');
+    el.id='previewTooltip';
+    el.style.cssText='position:fixed;pointer-events:none;z-index:10000;'
+      +'background:rgba(10,20,35,0.95);border:1px solid #4fc3f7;'
+      +'border-radius:6px;padding:8px 11px;font-size:.72rem;'
+      +'color:#c8daf0;font-family:"Space Mono",monospace;'
+      +'box-shadow:0 4px 14px rgba(0,0,0,0.65);min-width:140px';
+    document.body.appendChild(el);
+  }
+  // 인접 도시·헬기장 자동 감지
+  let adjInfo='';
+  for(const c of cities){
+    if(isTowerConnToCity({x:pt.x,y:pt.y},c)){
+      adjInfo+=`<div style="color:#ffd54f;font-size:.66rem">🏙 ${c.label||'도시'} 인접</div>`;
+    }
+  }
+  for(const al of alliances){
+    if(isConnToHelipad({x:pt.x,y:pt.y},al.helipad)){
+      adjInfo+=`<div style="color:${al.color};font-size:.66rem">🚁 ${al.name} 헬기장 인접</div>`;
+    }
+  }
+  el.innerHTML=`
+    <div style="color:${pt.color};font-weight:700;margin-bottom:4px;font-size:.78rem">🔮 예측 타워 #${pt.num}</div>
+    <div style="color:#888;margin-bottom:3px">📍 (${pt.x}, ${pt.y})</div>
+    <div style="color:#aaa;font-size:.66rem;margin-bottom:2px">수동 배치 (실제 미생성)</div>
+    ${adjInfo||'<div style="color:#666;font-size:.66rem">인접 도시/헬기장 없음</div>'}
+  `;
+  el.style.left=(clientX+14)+'px';
+  el.style.top=(clientY+8)+'px';
+  el.style.display='block';
+}
 function hidePreviewTooltip(){
   const el=document.getElementById('previewTooltip');
   if(el) el.style.display='none';
@@ -2184,8 +2219,17 @@ canvas.addEventListener('mousemove',e=>{
     if(Math.max(Math.abs(pt.x-raw.x),Math.abs(pt.y-raw.y))<=TS/2){ _hovIdx=i; break; }
   }
   if(_hovIdx!==previewHoverIdx){ previewHoverIdx=_hovIdx; }
-  if(_hovIdx>=0) showPreviewTooltip(previewTowers[_hovIdx],e.clientX,e.clientY);
-  else hidePreviewTooltip();
+  if(_hovIdx>=0){ showPreviewTooltip(previewTowers[_hovIdx],e.clientX,e.clientY); }
+  else {
+    // 수동 예측 타워 호버 감지
+    let _mHov=-1;
+    for(let i=0;i<manualPreviewTowers.length;i++){
+      const pt=manualPreviewTowers[i];
+      if(Math.max(Math.abs(pt.x-raw.x),Math.abs(pt.y-raw.y))<=TS/2){ _mHov=i; break; }
+    }
+    if(_mHov>=0) showManualPreviewTooltip(manualPreviewTowers[_mHov],e.clientX,e.clientY);
+    else hidePreviewTooltip();
+  }
   draw();
 });
 
