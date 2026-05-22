@@ -1103,9 +1103,10 @@ function planTowerPlacement(srcX,srcY,srcType,srcR,tx,ty,al){
       // 평가 기준: 목표 방향 투영값(progression) 최대 (단순 거리가 아니라 "얼마나 전진했는가")
       const reach=ct==='tower'?13:16; // tower:12+여유, zone:15+여유
       const baseX=Math.round(cx), baseY=Math.round(cy);
-      // 타워 중심부 3x3가 도시·헬기장 15x15 영토 내부로 진입 금지
-      // 진입 조건: |dx|<9 AND |dy|<9 (city/helipad 반경 7.5 + 타워 중심 1.5 = 9)
-      // → 타워 외곽(가장자리)은 영토 안으로 들어와도 OK, 중심부만 침범 차단 → bridge 정상
+      // 타워 중심부 3x3 침범 금지 — 도시/헬기장(15x15) 영토 + 다른 타워(중심 3x3)
+      // 도시/헬기장: |dx|<9 AND |dy|<9 (반경 7.5 + 타워 중심 1.5 = 9)
+      // 타워-타워: |dx|<3 AND |dy|<3 (중심 1.5 + 1.5 = 3)
+      // → 타워 외곽은 영토 안으로 들어와도 OK, 중심부만 침범 차단
       const isInsideRestrictedZone=(qx,qy)=>{
         for(const c of cities){
           const ccx=c.x+c.r/2, ccy=c.y-c.r/2;
@@ -1115,6 +1116,14 @@ function planTowerPlacement(srcX,srcY,srcType,srcR,tx,ty,al){
           const h=al2.helipad;
           const hcx=h.x+h.r/2, hcy=h.y-h.r/2;
           if(Math.abs(qx-hcx)<9 && Math.abs(qy-hcy)<9) return true;
+          // 기존 타워와 중심 3x3 겹침 차단
+          for(const t of al2.towers){
+            if(Math.abs(qx-t.x)<3 && Math.abs(qy-t.y)<3) return true;
+          }
+        }
+        // 이번 경로에서 이미 배치한 타워와도 중심 3x3 겹침 차단
+        for(const pt of placed){
+          if(Math.abs(qx-pt.x)<3 && Math.abs(qy-pt.y)<3) return true;
         }
         return false;
       };
