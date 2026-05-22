@@ -760,7 +760,7 @@ tr:hover td{background:oklch(0.82 0.15 195/.025)}
 
 <script>
 // ── 상수 ──────────────────────────────────────────────
-const TS = 9, GAP = 3;
+const TS = 9, GAP = 0; // GAP=0: 가장자리 접촉(거리 0) 또는 겹침만 연결, 모서리만 닿거나 떨어져 있으면 미연결
 let snapMode = 3;
 
 // ── 타워 비용 룩업테이블 (실제 게임 데이터) ──────────
@@ -1100,10 +1100,10 @@ function planTowerPlacement(srcX,srcY,srcType,srcR,tx,ty,al){
       }
     } else {
       // 전진 — 모든 정수 후보 위치 브루트 포스 탐색
-      // (Math.round/분수 source 이슈 회피 — 정확한 정수 검증)
+      // 평가 기준: 목표 방향 투영값(progression) 최대 (단순 거리가 아니라 "얼마나 전진했는가")
       const reach=ct==='tower'?13:16; // tower:12+여유, zone:15+여유
       const baseX=Math.round(cx), baseY=Math.round(cy);
-      let best=null;
+      let best=null, fallback=null;
       for(let ox=-reach;ox<=reach;ox++){
         for(let oy=-reach;oy<=reach;oy++){
           if(ox===0&&oy===0) continue;
@@ -1112,16 +1112,31 @@ function planTowerPlacement(srcX,srcY,srcType,srcR,tx,ty,al){
           const rdx=qx-cx, rdy=qy-cy;
           const d2=Math.hypot(rdx,rdy);
           if(d2<1) continue;
-          const cosTheta=(rdx*ux+rdy*uy)/d2;
-          if(cosTheta<0.92) continue; // 23°↑ 벗어나면 제외 — 직진성 우선
-          if(!best||d2>best.d) best={x:qx,y:qy,d:d2};
+          const proj=rdx*ux+rdy*uy; // 목표 방향 투영
+          if(proj<0.5) continue; // 후진 금지
+          // 1차: 방향 정렬 + 최대 투영
+          const cosTheta=proj/d2;
+          if(cosTheta>=0.9){
+            if(!best||proj>best.proj) best={x:qx,y:qy,d:d2,proj};
+          }
+          // fallback: 방향 다소 어긋나도 progression 큰 후보
+          if(!fallback||proj>fallback.proj) fallback={x:qx,y:qy,d:d2,proj};
         }
       }
-      if(best){ px=best.x; py=best.y; }
+      const pick=best||fallback;
+      if(pick){ px=pick.x; py=pick.y; }
       else {
-        // 안전망 — 절대 발생 안 해야 함
+        // 절대 발생 안 해야 함 — 안전망에서 검증 후 선택
         px=Math.round(cx+ux*maxStep*0.7);
         py=Math.round(cy+uy*maxStep*0.7);
+        if(!isConnFromSrc(px,py)){
+          // 마지막 fallback: source 방향 점진 축소
+          for(let s=0.6;s>=0.2;s-=0.1){
+            const tx2=Math.round(cx+ux*maxStep*s);
+            const ty2=Math.round(cy+uy*maxStep*s);
+            if(isConnFromSrc(tx2,ty2)){ px=tx2; py=ty2; break; }
+          }
+        }
       }
     }
     // 정체 감지 — 같은 좌표 반복이면 즉시 중단 (무한루프 방지)
