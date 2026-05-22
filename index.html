@@ -1384,12 +1384,8 @@ function draw() {
       if(isCityConnToHelipad(c, al.helipad)) return true;
       return connTowers.some(t => isTowerConnToCity(t, c));
     });
-    // 소유 연맹이 더 이상 이 도시에 연결되지 않으면 소유권 자동 해제
-    if(c.owner != null) {
-      const ownerAl = alliances[c.owner];
-      const ownerStillConn = ownerAl && connAlliances.some(al => al.id === ownerAl.id);
-      if(!ownerStillConn) c.owner = null;
-    }
+    // (자동 해제 제거 — 우클릭 수동 지정이 즉시 덮어써지는 문제로 인해)
+    // 소유권은 사용자 우클릭 메뉴로만 변경. '소유 없음' 옵션도 메뉴에 있음.
     const owner = c.owner!=null ? alliances[c.owner] : null;
     const displayColor = owner ? owner.color : c.color;
     drawRect(c.x,c.y,c.r,displayColor,cityEmoji(c.level),c.label,connAlliances,owner);
