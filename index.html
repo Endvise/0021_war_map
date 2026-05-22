@@ -17,7 +17,7 @@
   --bg2:oklch(0.15 0.014 250);--bg3:oklch(0.19 0.016 250);
   --line:oklch(0.26 0.016 250);--line-soft:oklch(0.21 0.012 250);
   --fg:oklch(0.95 0.005 250);--fg2:oklch(0.78 0.010 250);
-  --fg3:oklch(0.58 0.010 250);--fg4:oklch(0.40 0.010 250);
+  --fg3:oklch(0.68 0.010 250);--fg4:oklch(0.55 0.010 250);
   --accent:oklch(0.78 0.165 65);
   --accent-ink:oklch(0.16 0.040 65);
   --accent-soft:oklch(0.78 0.165 65 / .14);
@@ -33,7 +33,7 @@
   --border:var(--line);--border2:var(--line-soft);
 }
 *{box-sizing:border-box;margin:0;padding:0}
-html{font-size:13px}
+html{font-size:14.5px}
 body{
   font-family:var(--font-ui);background:var(--bg0);color:var(--fg2);
   display:flex;flex-direction:column;height:100vh;overflow:hidden;
@@ -133,7 +133,7 @@ button{font:inherit;color:inherit;cursor:pointer}
 }
 .chip:hover{background:var(--bg3);color:var(--fg)}
 .chip[data-active="1"]{background:var(--accent-soft);color:var(--accent);border-color:oklch(0.78 0.165 65/.4)}
-.hint{font-size:.62rem;color:var(--fg4);margin-left:auto;font-family:var(--font-mono)}
+.hint{font-size:.7rem;color:var(--fg4);margin-left:auto;font-family:var(--font-mono)}
 /* ── ALLIANCE BUTTONS ── */
 #allianceBtns{display:flex;gap:3px;flex-wrap:wrap}
 .al-btn{
@@ -147,15 +147,96 @@ button{font:inherit;color:inherit;cursor:pointer}
 .al-rm:hover{opacity:1}
 /* ── LAYOUT ── */
 .main{display:flex;flex:1;min-height:0}
-.map-wrap{flex:1;overflow:auto;background:oklch(0.07 0.008 250);cursor:crosshair;position:relative}
-canvas#map{display:block;image-rendering:pixelated}
-.map-wrap::before,.map-wrap::after{
-  content:'';position:absolute;width:24px;height:24px;
-  pointer-events:none;z-index:10;
-  border-color:oklch(0.82 0.15 195/.2);border-style:solid;
+/* 맵 스테이지 — 오버레이 컨테이너 (스크롤 안됨) */
+.map-stage{
+  flex:1;position:relative;min-width:0;min-height:0;
+  background:oklch(0.07 0.008 250);
 }
-.map-wrap::before{top:8px;left:8px;border-width:1px 0 0 1px}
-.map-wrap::after{top:8px;right:8px;border-width:1px 1px 0 0}
+.map-wrap{position:absolute;inset:0;overflow:auto;cursor:crosshair}
+canvas#map{display:block;image-rendering:pixelated}
+.map-stage::before,.map-stage::after{
+  content:'';position:absolute;width:24px;height:24px;
+  pointer-events:none;z-index:50;
+  border-color:oklch(0.82 0.15 195/.25);border-style:solid;
+}
+.map-stage::before{top:8px;left:8px;border-width:1px 0 0 1px}
+.map-stage::after{top:8px;right:8px;border-width:1px 1px 0 0}
+/* 모드 힌트 핀 — 상단 중앙 */
+.modepill{
+  position:absolute;top:14px;left:50%;transform:translateX(-50%);
+  display:flex;align-items:center;gap:8px;
+  background:var(--bg1);border:1px solid var(--accent);
+  color:var(--accent);border-radius:var(--r-pill);
+  padding:5px 14px 5px 6px;font-size:.72rem;font-weight:600;
+  box-shadow:0 0 0 4px var(--accent-soft),0 4px 14px rgba(0,0,0,.4);
+  z-index:60;white-space:nowrap;
+  font-family:var(--font-ui);
+}
+.modepill-ico{
+  display:inline-grid;place-items:center;width:20px;height:20px;
+  border-radius:50%;background:var(--accent);color:var(--accent-ink);
+  font-size:.8rem;
+}
+/* 줌 컨트롤 — 좌측 상단(헬프 핀과 안겹치게 좌측) */
+.zoomctl{
+  position:absolute;left:12px;top:48px;
+  display:flex;flex-direction:column;z-index:60;
+  background:var(--bg1);border:1px solid rgba(50,90,160,.45);
+  border-radius:var(--r-md);overflow:hidden;
+  box-shadow:0 4px 12px rgba(0,0,0,.5);
+}
+.zoomctl button{
+  width:30px;height:30px;background:transparent;border:0;
+  color:var(--fg2);cursor:pointer;
+  display:grid;place-items:center;font-size:1rem;
+  transition:background var(--dur),color var(--dur);
+}
+.zoomctl button:hover{background:var(--bg3);color:var(--fg)}
+.zoomctl .zlv{
+  font-family:var(--font-mono);font-size:.7rem;color:var(--accent);
+  text-align:center;padding:3px 0;
+  border-top:1px solid rgba(50,90,160,.4);
+  border-bottom:1px solid rgba(50,90,160,.4);
+  background:var(--bg0);font-weight:700;
+}
+/* 좌하단 상태 패널 */
+.map-status{
+  position:absolute;left:12px;bottom:12px;z-index:60;
+  display:flex;gap:6px;
+}
+.map-status .stat{
+  background:rgba(9,14,24,.85);backdrop-filter:blur(6px);
+  border:1px solid rgba(50,90,160,.4);
+  border-radius:var(--r-md);padding:5px 10px;
+  font-family:var(--font-mono);font-size:.66rem;
+  display:flex;align-items:center;gap:7px;
+}
+.map-status .stat .lbl{
+  color:var(--fg4);text-transform:uppercase;
+  letter-spacing:.08em;font-size:.66rem;font-weight:700;
+}
+.map-status .stat .v{color:var(--cyan);font-weight:600}
+/* 우하단 미니맵 */
+.minimap-wrap{
+  position:absolute;right:12px;bottom:12px;z-index:60;
+  background:var(--bg1);border:1px solid rgba(50,90,160,.5);
+  border-radius:var(--r-md);padding:5px;
+  box-shadow:0 6px 20px rgba(0,0,0,.55);
+}
+.minimap-hd{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:0 4px 3px;font-family:var(--font-mono);
+  font-size:.68rem;color:var(--fg3);text-transform:uppercase;
+  letter-spacing:.1em;font-weight:700;
+}
+.minimap-toggle{
+  background:transparent;border:0;color:var(--fg3);
+  cursor:pointer;font-size:.75rem;padding:0 4px;line-height:1;
+}
+.minimap-toggle:hover{color:var(--accent)}
+#minimap{display:block;border-radius:3px;cursor:pointer}
+.minimap-wrap.collapsed #minimap{display:none}
+.minimap-wrap.collapsed .minimap-hd{padding:2px 4px}
 /* ── SIDEBAR ── */
 .side{
   width:256px;flex-shrink:0;background:var(--bg1);border-left:1px solid var(--line);
@@ -304,7 +385,7 @@ tr:hover td{background:oklch(0.82 0.15 195/.025)}
 [data-tip]:hover::after,[data-tip]:hover::before{opacity:1}
 /* ── STATUS BAR ── */
 .posbar{
-  font-size:.63rem;color:var(--fg4);padding:2px 10px;
+  font-size:.63rem;color:var(--fg2);padding:2px 10px;
   background:var(--bg1);border-top:1px solid var(--line);
   flex-shrink:0;height:22px;font-family:var(--font-mono);
   display:flex;align-items:center;gap:8px;
@@ -461,7 +542,36 @@ tr:hover td{background:oklch(0.82 0.15 195/.025)}
 </div>
 
 <div class="main">
-  <div class="map-wrap" id="mapWrap"><canvas id="map"></canvas></div>
+  <div class="map-stage">
+    <div class="map-wrap" id="mapWrap">
+      <canvas id="map"></canvas>
+    </div>
+    <!-- floating overlays (스크롤 영향 안 받음) -->
+    <div class="modepill" id="modePill" data-tip="현재 활성 모드">
+      <span class="modepill-ico" id="modePillIco">🖱</span>
+      <span id="modePillTxt">일반 모드</span>
+    </div>
+    <div class="zoomctl">
+      <button onclick="zoomIn()" data-tip="줌인 (휠↑)">+</button>
+      <div class="zlv" id="zlvIndicator">×3</div>
+      <button onclick="zoomOut()" data-tip="줌아웃 (휠↓)">−</button>
+      <button onclick="zoomReset()" data-tip="초기 줌·중앙으로" style="border-top:1px solid rgba(50,90,160,.4)">⌖</button>
+    </div>
+    <div class="map-status">
+      <div class="stat"><span class="lbl">좌표</span><span class="v" id="statCoord">—</span></div>
+      <div class="stat"><span class="lbl">타워</span><span class="v" id="statTowers">0</span></div>
+      <div class="stat"><span class="lbl">도시</span><span class="v" id="statCities">0</span></div>
+    </div>
+    <div class="minimap-wrap">
+      <div class="minimap-hd">
+        <span>미니맵</span>
+        <button class="minimap-toggle" onclick="toggleMinimap()" data-tip="미니맵 접기/펼치기">−</button>
+      </div>
+      <canvas id="minimap" width="160" height="118"
+        title="클릭으로 해당 위치로 이동"
+        onclick="minimapClick(event)"></canvas>
+    </div>
+  </div>
   <div class="side">
     <div class="side-tabs">
       <button class="tab active" onclick="showTab('tpl',this)" data-tip="맵 설정 / 타워 규칙 / 목표 좌표">🗺<span class="tab-lbl">맵</span></button>
@@ -790,6 +900,7 @@ function setTowerMode(m) {
   const activeBtn=document.getElementById(activeIds[m]);
   if(activeBtn) activeBtn.setAttribute('data-active','1');
   canvas.style.cursor = m==='pointer' ? 'default' : 'crosshair';
+  updateModePill();
 }
 
 function undoTower() {
@@ -975,9 +1086,24 @@ function hitTest(gx,gy) {
 // ── 그리기 ────────────────────────────────────────────
 function draw() {
   ctx.clearRect(0,0,canvas.width,canvas.height);
-  ctx.fillStyle='#0a0f1a'; ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.fillStyle='#090e18'; ctx.fillRect(0,0,canvas.width,canvas.height);
   drawGrid();
   drawTerrains();
+  // 연맹 영토 글로우 — 타워 클러스터 방사형 그라디언트
+  alliances.forEach(al => {
+    if (al.towers.length === 0) return;
+    const mx = al.towers.reduce((s,t)=>s+t.x,0)/al.towers.length;
+    const my = al.towers.reduce((s,t)=>s+t.y,0)/al.towers.length;
+    const {cx,cy} = toC(mx, my);
+    const r = (60 + al.towers.length * 10) * ppc;
+    const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+    const c = al.color;
+    grad.addColorStop(0,   c + '2a');
+    grad.addColorStop(0.5, c + '12');
+    grad.addColorStop(1,   c + '00');
+    ctx.fillStyle = grad;
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI*2); ctx.fill();
+  });
   // 동맹 그룹 시각화 — 헬기장 컬러 링 + 배지
   const allyGroups=getAllyGroups();
   allyGroups.forEach((grp,gi)=>{
@@ -1042,6 +1168,12 @@ function draw() {
       if(isCityConnToHelipad(c, al.helipad)) return true;
       return connTowers.some(t => isTowerConnToCity(t, c));
     });
+    // 소유 연맹이 더 이상 이 도시에 연결되지 않으면 소유권 자동 해제
+    if(c.owner != null) {
+      const ownerAl = alliances[c.owner];
+      const ownerStillConn = ownerAl && connAlliances.some(al => al.id === ownerAl.id);
+      if(!ownerStillConn) c.owner = null;
+    }
     const owner = c.owner!=null ? alliances[c.owner] : null;
     const displayColor = owner ? owner.color : c.color;
     drawRect(c.x,c.y,c.r,displayColor,cityEmoji(c.level),c.label,connAlliances,owner);
@@ -1051,28 +1183,38 @@ function draw() {
   drawCollisionMarkers();
   drawWaypoints();
   if (ghost) drawGhost();
+  drawMinimap();
+  updateMapStatus();
   saveLS();
 }
 
 function drawGrid() {
   for (let x=0;x<=MAP_W;x++) {
     const px=x*ppc;
-    ctx.strokeStyle=x%TS===0?'#1e3060':x%3===0?'#131c30':'#0d1420';
-    ctx.lineWidth=x%TS===0?.8:.4;
+    ctx.strokeStyle=x%TS===0?'rgba(50,90,160,0.55)':x%3===0?'rgba(30,55,110,0.35)':'rgba(18,30,65,0.3)';
+    ctx.lineWidth=x%TS===0?.9:.35;
     ctx.beginPath();ctx.moveTo(px,0);ctx.lineTo(px,canvas.height);ctx.stroke();
   }
   for (let y=0;y<=MAP_H;y++) {
     const py=y*ppc;
-    ctx.strokeStyle=y%TS===0?'#1e3060':y%3===0?'#131c30':'#0d1420';
-    ctx.lineWidth=y%TS===0?.8:.4;
+    ctx.strokeStyle=y%TS===0?'rgba(50,90,160,0.55)':y%3===0?'rgba(30,55,110,0.35)':'rgba(18,30,65,0.3)';
+    ctx.lineWidth=y%TS===0?.9:.35;
     ctx.beginPath();ctx.moveTo(0,py);ctx.lineTo(canvas.width,py);ctx.stroke();
   }
   if (ppc>=2) {
-    ctx.fillStyle='#2a3a5a'; ctx.font=`${Math.max(8,ppc*2.5)}px sans-serif`;
+    ctx.fillStyle='rgba(80,120,200,0.45)';
+    ctx.font=`${Math.max(8,ppc*2.2)}px "Space Mono",monospace`;
     ctx.textAlign='left'; ctx.textBaseline='top';
     for (let x=50;x<=MAP_W;x+=50){const{cx}=toC(x,MAP_H);ctx.fillText(x,cx+1,1);}
     ctx.textAlign='right';
     for (let y=50;y<=MAP_H;y+=50){const{cy}=toC(0,y);ctx.fillText(y,canvas.width-1,cy+1);}
+    // 100단위 주요 좌표 강조
+    ctx.fillStyle='rgba(100,150,240,0.7)';
+    ctx.font=`bold ${Math.max(9,ppc*2.8)}px "Space Mono",monospace`;
+    ctx.textAlign='left'; ctx.textBaseline='top';
+    for (let x=100;x<=MAP_W;x+=100){const{cx}=toC(x,MAP_H);ctx.fillText(x,cx+1,1);}
+    ctx.textAlign='right';
+    for (let y=100;y<=MAP_H;y+=100){const{cy}=toC(0,y);ctx.fillText(y,canvas.width-1,cy+1);}
   }
 }
 
@@ -1153,25 +1295,155 @@ function drawBlocks(towers, color, connectedSet=null){
     } else {
       blockColor=color; fillAlpha='cc'; strokeColor=color;
     }
-    ctx.fillStyle=blockColor+fillAlpha; ctx.fillRect(cx-s/2,cy-s/2,s,s);
-    ctx.strokeStyle=strokeColor;
-    ctx.lineWidth=1.5; ctx.strokeRect(cx-s/2,cy-s/2,s,s);
+    // 사각형 타워
+    ctx.fillStyle = blockColor+fillAlpha; ctx.fillRect(cx-s/2,cy-s/2,s,s);
+    ctx.strokeStyle = strokeColor; ctx.lineWidth = 1.8; ctx.strokeRect(cx-s/2,cy-s/2,s,s);
+    // HP 바 (점화/수리 중)
     if(isBurning||isRepairing){
-      ctx.fillStyle='#333'; ctx.fillRect(cx-s/2,cy+s/2+1,s,ppc*1.5);
+      const bx=cx-s/2, by=cy+s/2+1;
+      ctx.fillStyle='#222'; ctx.fillRect(bx,by,s,ppc*1.5);
       ctx.fillStyle=isRepairing?'#66bb6a':(hpRatio>0.5?'#81c784':'#ff9800');
-      ctx.fillRect(cx-s/2,cy+s/2+1,s*hpRatio,ppc*1.5);
+      ctx.fillRect(bx,by,s*hpRatio,ppc*1.5);
     }
-    ctx.strokeStyle='#ffffff22'; ctx.lineWidth=.5;
-    for(let g=1;g<3;g++){
-      const ox=cx-s/2+b3*g,oy=cy-s/2+b3*g;
-      ctx.beginPath();ctx.moveTo(ox,cy-s/2);ctx.lineTo(ox,cy+s/2);ctx.stroke();
-      ctx.beginPath();ctx.moveTo(cx-s/2,oy);ctx.lineTo(cx+s/2,oy);ctx.stroke();
+    // 점화 펄스 링
+    if(isBurning){
+      const pulse=(Math.sin(Date.now()/280)*0.5+0.5);
+      ctx.strokeStyle=`rgba(255,109,0,${0.3+pulse*0.55})`;
+      ctx.lineWidth=2+pulse*2;
+      ctx.beginPath(); ctx.arc(cx,cy,s/2*1.35+pulse*3,0,Math.PI*2); ctx.stroke();
     }
-    ctx.strokeStyle=isLinked?color+'dd':'#88888888'; ctx.lineWidth=1;
-    ctx.beginPath();ctx.arc(cx,cy,b3*.8,0,Math.PI*2);ctx.stroke();
-    ctx.fillStyle=isLinked?'#fff':'#888'; ctx.font=`bold ${b3*1.1}px sans-serif`;
+    // 수리 중 초록 링
+    if(isRepairing){
+      ctx.strokeStyle='rgba(102,187,106,0.55)';
+      ctx.lineWidth=1.5;
+      ctx.beginPath(); ctx.arc(cx,cy,s/2*1.3,0,Math.PI*2); ctx.stroke();
+    }
+    // 타워 번호
+    ctx.fillStyle=isLinked?'#fff':'#888';
+    ctx.font=`bold ${Math.max(8,b3)}px "Space Mono",monospace`;
     ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(i+1,cx,cy);
   });
+}
+
+// ── 맵 오버레이 (modepill / zoom / status) ────────────────
+function updateModePill(){
+  const cfg={
+    pointer:{ico:'🖱',txt:'일반 모드 — 드래그/우클릭 조작'},
+    build:  {ico:'🔨',txt:'건설 모드 — 클릭으로 타워 배치'},
+    demolish:{ico:'🔧',txt:'철거 모드 — 타워 클릭으로 삭제'},
+    ignite: {ico:'🔥',txt:'점화 모드 — 타워 클릭'},
+    route:  {ico:'🗺',txt:'경로 모드 — 우클릭으로 경유지 추가'}
+  };
+  const c=cfg[towerMode]||cfg.pointer;
+  const ic=document.getElementById('modePillIco');
+  const tx=document.getElementById('modePillTxt');
+  if(ic) ic.textContent=c.ico;
+  if(tx) tx.textContent=c.txt;
+}
+function updateMapStatus(){
+  const z=document.getElementById('zlvIndicator');
+  if(z) z.textContent='×'+ppc;
+  const tc=alliances.reduce((s,a)=>s+a.towers.length,0);
+  const cc=cities.filter(c=>c.owner!=null).length;
+  const tEl=document.getElementById('statTowers');
+  const cEl=document.getElementById('statCities');
+  if(tEl) tEl.textContent=tc;
+  if(cEl) cEl.textContent=cc+'/'+cities.length;
+}
+function zoomIn(){
+  const np=Math.min(MAX_PPC,ppc+1);
+  if(np===ppc) return;
+  const wrap=document.getElementById('mapWrap');
+  const cx=wrap.scrollLeft+wrap.clientWidth/2;
+  const cy=wrap.scrollTop+wrap.clientHeight/2;
+  const rx=cx/canvas.width, ry=cy/canvas.height;
+  ppc=np; resizeCanvas(); draw();
+  wrap.scrollLeft=rx*canvas.width-wrap.clientWidth/2;
+  wrap.scrollTop =ry*canvas.height-wrap.clientHeight/2;
+  updateMapStatus();
+}
+function zoomOut(){
+  const np=Math.max(MIN_PPC,ppc-1);
+  if(np===ppc) return;
+  const wrap=document.getElementById('mapWrap');
+  const cx=wrap.scrollLeft+wrap.clientWidth/2;
+  const cy=wrap.scrollTop+wrap.clientHeight/2;
+  const rx=cx/canvas.width, ry=cy/canvas.height;
+  ppc=np; resizeCanvas(); draw();
+  wrap.scrollLeft=rx*canvas.width-wrap.clientWidth/2;
+  wrap.scrollTop =ry*canvas.height-wrap.clientHeight/2;
+  updateMapStatus();
+}
+function zoomReset(){
+  ppc=3; resizeCanvas(); draw();
+  const wrap=document.getElementById('mapWrap');
+  wrap.scrollLeft=(canvas.width-wrap.clientWidth)/2;
+  wrap.scrollTop =(canvas.height-wrap.clientHeight)/2;
+  updateMapStatus();
+}
+function toggleMinimap(){
+  const w=document.querySelector('.minimap-wrap');
+  if(!w) return;
+  w.classList.toggle('collapsed');
+  const btn=w.querySelector('.minimap-toggle');
+  if(btn) btn.textContent=w.classList.contains('collapsed')?'+':'−';
+}
+
+// ── 미니맵 ────────────────────────────────────────────
+function drawMinimap(){
+  const mc=document.getElementById('minimap'); if(!mc) return;
+  const mctx=mc.getContext('2d');
+  const MW=mc.width, MH=mc.height;
+  const sx=MW/MAP_W, sy=MH/MAP_H;
+  mctx.fillStyle='rgba(9,14,24,0.92)'; mctx.fillRect(0,0,MW,MH);
+  // 격자
+  mctx.strokeStyle='rgba(40,70,140,0.3)'; mctx.lineWidth=0.5;
+  for(let x=0;x<=MAP_W;x+=50){mctx.beginPath();mctx.moveTo(x*sx,0);mctx.lineTo(x*sx,MH);mctx.stroke();}
+  for(let y=0;y<=MAP_H;y+=50){mctx.beginPath();mctx.moveTo(0,y*sy);mctx.lineTo(MW,y*sy);mctx.stroke();}
+  // 도시
+  cities.forEach(c=>{
+    const own=c.owner!=null?alliances[c.owner]:null;
+    const mx=(c.x+c.r/2)*sx, my=MH-(c.y+c.r/2)*sy;
+    mctx.fillStyle=own?own.color+'cc':c.color+'55';
+    mctx.fillRect(mx-3,my-3,6,6);
+    mctx.strokeStyle=own?own.color:'rgba(150,150,150,0.4)';
+    mctx.lineWidth=0.8; mctx.strokeRect(mx-3,my-3,6,6);
+  });
+  // 타워
+  alliances.forEach(al=>{
+    al.towers.forEach(t=>{
+      mctx.fillStyle=al.color+'cc';
+      mctx.fillRect(t.x*sx-1.5,(MH-t.y*sy)-1.5,3,3);
+    });
+  });
+  // 헬기장
+  alliances.forEach(al=>{
+    const hx=(al.helipad.x+al.helipad.r/2)*sx;
+    const hy=MH-(al.helipad.y+al.helipad.r/2)*sy;
+    mctx.strokeStyle=al.color; mctx.lineWidth=1;
+    mctx.beginPath(); mctx.arc(hx,hy,2.5,0,Math.PI*2); mctx.stroke();
+  });
+  // 뷰포트 표시
+  const wrap=document.getElementById('mapWrap'); if(!wrap) return;
+  const vpX=wrap.scrollLeft/ppc*sx;
+  const vpY=wrap.scrollTop/ppc*sy;
+  const vpW=wrap.clientWidth/ppc*sx;
+  const vpH=wrap.clientHeight/ppc*sy;
+  mctx.strokeStyle='rgba(100,160,255,0.7)'; mctx.lineWidth=1.2;
+  mctx.strokeRect(vpX,vpY,vpW,vpH);
+  // 테두리
+  mctx.strokeStyle='rgba(50,90,160,0.6)'; mctx.lineWidth=1;
+  mctx.strokeRect(0,0,MW,MH);
+}
+
+function minimapClick(e){
+  const mc=document.getElementById('minimap'); if(!mc) return;
+  const rect=mc.getBoundingClientRect();
+  const mx=(e.clientX-rect.left)/mc.width*MAP_W;
+  const my=(e.clientY-rect.top)/mc.height*MAP_H;
+  const wrap=document.getElementById('mapWrap'); if(!wrap) return;
+  wrap.scrollLeft=(mx-wrap.clientWidth/ppc/2)*ppc;
+  wrap.scrollTop=(MAP_H-my-wrap.clientHeight/ppc/2)*ppc;
 }
 
 let ghost=null;
@@ -1494,13 +1766,17 @@ canvas.addEventListener('mousemove',e=>{
       const wi=findNearestWaypoint(raw.x,raw.y);
       canvas.style.cursor=wi>=0?'grab':'crosshair';
     }
-    document.getElementById('posBar').textContent=`좌표: (${Math.round(raw.x)}, ${Math.round(raw.y)})`;
+    const _c=`(${Math.round(raw.x)}, ${Math.round(raw.y)})`;
+    document.getElementById('posBar').textContent='좌표: '+_c;
+    const _sc=document.getElementById('statCoord'); if(_sc) _sc.textContent=_c;
     draw(); return;
   }
   if(allyMode){ // 동맹 설정 모드 중 드래그 방지
     const hit=hitTest(raw.x,raw.y);
     canvas.style.cursor=hit&&hit.type==='helipad'?'pointer':'crosshair';
-    document.getElementById('posBar').textContent=`좌표: (${Math.round(raw.x)}, ${Math.round(raw.y)})`;
+    const _c2=`(${Math.round(raw.x)}, ${Math.round(raw.y)})`;
+    document.getElementById('posBar').textContent='좌표: '+_c2;
+    const _sc2=document.getElementById('statCoord'); if(_sc2) _sc2.textContent=_c2;
     draw(); return;
   }
   if(terrainMode&&drawingTerrain){
@@ -1519,7 +1795,9 @@ canvas.addEventListener('mousemove',e=>{
     ghost=terrainMode?null:getSnapped(e);
   }
   const g=ghost||getSnapped(e);
-  document.getElementById('posBar').textContent=`좌표: (${g.x}, ${g.y})`;
+  const _cg=`(${g.x}, ${g.y})`;
+  document.getElementById('posBar').textContent='좌표: '+_cg;
+  const _scg=document.getElementById('statCoord'); if(_scg) _scg.textContent=_cg;
   draw();
 });
 
@@ -1974,7 +2252,11 @@ function showHelp(){
 }
 
 function fullReset(){
-  if(!confirm('모든 데이터를 초기 상태로 되돌립니다.\n(타워, 경유지, 도시 점령, 동맹 관계, 저장값 전체 삭제)\n\n계속하시겠습니까?')) return;
+  if(!confirm('모든 데이터를 초기 상태로 되돌립니다.\n(타워, 경유지, 도시 점령, 동맹 관계, 저장값 전체 삭제)\n\n※ 현재 전장 세션도 종료됩니다.\n\n계속하시겠습니까?')) return;
+  // Firebase 룸 상태 삭제 + 연결 해제 + 시드 캐시 제거 (재접속 시 옛 상태 복원 방지)
+  try { if(typeof _syncRef!=='undefined' && _syncRef) _syncRef.remove(); } catch(e){}
+  try { if(typeof _usersRef!=='undefined' && _usersRef) _usersRef.off(); } catch(e){}
+  try { sessionStorage.removeItem('war_seed'); } catch(e){}
   localStorage.removeItem('war_map_v2');
   location.reload();
 }
@@ -2825,6 +3107,9 @@ setInterval(()=>{
   const utc = now.toUTCString().replace(/.*?(\d{2}:\d{2}:\d{2}).*/,'$1');
   el.innerHTML = utc + ' UTC' + (simTime ? ' <span style="color:#ff9800;font-size:.65rem">[예측모드]</span>' : '');
 }, 1000);
+
+updateModePill();
+updateMapStatus();
 </script>
 <!-- 랭킹 모달 -->
 <div id="rankingModal" onclick="if(event.target===this)hideRanking()"
