@@ -1168,6 +1168,7 @@ const G      = id => +document.getElementById(id).value;
 
 // ── 드래그 ────────────────────────────────────────────
 let drag={}, isDragging=false;
+let movingTower=null; // {alIdx, ti} — 우클릭 메뉴에서 '이동' 선택 시 다음 좌클릭에서 이동
 
 // ── 동맹 관계 ─────────────────────────────────────────
 let relations = {};
@@ -1867,6 +1868,19 @@ function getSnapped(e){const raw=getRaw(e);return snapPos(raw.x,raw.y);}
 
 canvas.addEventListener('mousedown',e=>{
   if(e.button!==0) return;
+  // 타워 이동 모드 — 다음 좌클릭으로 새 위치 설정
+  if(movingTower!==null){
+    const g=getSnapped(e);
+    const al=alliances[movingTower.alIdx];
+    if(al && al.towers[movingTower.ti]){
+      al.towers[movingTower.ti].x=g.x;
+      al.towers[movingTower.ti].y=g.y;
+    }
+    movingTower=null;
+    canvas.style.cursor='crosshair';
+    draw();
+    return;
+  }
   if(towerMode==='route'){
     const raw=getRaw(e);
     const wi=findNearestWaypoint(raw.x,raw.y);
@@ -2013,6 +2027,12 @@ canvas.addEventListener('mouseup',e=>{
 canvas.addEventListener('mouseleave',()=>{drag={};isDragging=false;ghost=null;drawingTerrain=null;canvas.style.cursor='crosshair';draw();});
 canvas.addEventListener('contextmenu',e=>{
   e.preventDefault();
+  // 타워 이동 모드 중이면 우클릭으로 취소
+  if(movingTower!==null){
+    movingTower=null;
+    canvas.style.cursor='crosshair';
+    return;
+  }
   const raw=getRaw(e);
   if(towerMode==='route'){
     const wi=findNearestWaypoint(raw.x,raw.y);
@@ -2074,7 +2094,14 @@ function showTowerMenu(al, alIdx, tIdx, px, py){
     al.cement=+(al.cement+refund).toFixed(1);
     al.towers.splice(tIdx,1);
   });
-  makeBtn('✕ 취소', '#607d8b', ()=>{});
+  makeBtn(`📍 이동 <span style="font-size:.7rem;color:#aaa">(다음 좌클릭=새 위치)</span>`, '#0277bd', ()=>{
+    movingTower={alIdx,ti:tIdx};
+    canvas.style.cursor='move';
+  });
+  makeBtn(`🗑 삭제 <span style="font-size:.7rem;color:#aaa">(반환 없음)</span>`, '#37474f', ()=>{
+    al.towers.splice(tIdx,1);
+  });
+  makeBtn('✕ 닫기', '#607d8b', ()=>{});
   document.body.appendChild(menu);
   const close=ev=>{ if(!menu.contains(ev.target)){menu.remove();document.removeEventListener('mousedown',close);} };
   setTimeout(()=>document.addEventListener('mousedown',close),10);
@@ -2924,15 +2951,24 @@ function calcWaypointRoute(){
       total+=effBm+wait; cem=ca-cost+p*wait; towerNum++;
       return {num:towerNum,x:pt.x,y:pt.y,cost,wait,total,cem,prod:p,newCities:newC,bridged:!!pt.throughCity};
     });
-    // 다음 세그먼트는 마지막 타워 위치에서 시작 — 도시 다리 효과 끝남
-    segSrcType='tower'; segSrcR=0;
-    // 단, 마지막 타워가 도시에 다리되어 있다면 다음 세그먼트는 그 도시에서 시작
-    if(positions.length>0 && positions[positions.length-1].throughCity){
-      const lastBridge=positions[positions.length-1].throughCity;
-      segSrcType='city'; segSrcR=lastBridge.r;
+    // 다음 세그먼트는 "실제 마지막 타워" 위치에서 시작 (웨이포인트 좌표가 아님)
+    // — 검증이 실제 타워와 어긋나는 버그 방지
+    if(positions.length>0){
+      const lastPos=positions[positions.length-1];
+      if(lastPos.throughCity){
+        // 도시 다리되면 도시 중심에서 다음 시작
+        curX=lastPos.throughCity.x+lastPos.throughCity.r/2;
+        curY=lastPos.throughCity.y-lastPos.throughCity.r/2;
+        segSrcType='city'; segSrcR=lastPos.throughCity.r;
+      } else {
+        curX=lastPos.x; curY=lastPos.y;
+        segSrcType='tower'; segSrcR=0;
+      }
+    } else {
+      curX=tx; curY=ty;
+      segSrcType='tower'; segSrcR=0;
     }
     segments.push({wpi,steps,dist,isLast:wpi===stopWps.length-1});
-    curX=tx; curY=ty;
   });
 
   const totalH=(total/60).toFixed(1);
