@@ -1038,7 +1038,17 @@ function planTowerPlacement(srcX,srcY,srcType,srcR,tx,ty,al){
   let cx=srcX, cy=srcY, ct=srcType, cr=srcR;
   let lastBridgeId=null; // 직전에 다리한 도시 — 같은 도시 재진입 차단
   let lastX=null, lastY=null; // 정체 감지
-  const SAFE=0.96;
+  const SAFE=0.94; // Math.round 경계 위반 방지 (45° 대각 등)
+  // 현재 source(cx,cy,ct,cr)에서 (qx,qy)로 isConn/isConnToZone 검증
+  const isConnFromSrc=(qx,qy)=>{
+    if(ct==='tower'){
+      const adx=Math.abs(qx-cx), ady=Math.abs(qy-cy);
+      return (adx<TS && Math.max(0,ady-TS)<=GAP) || (ady<TS && Math.max(0,adx-TS)<=GAP);
+    }
+    const hs=TS/2+cr/2;
+    const adx=Math.round(Math.abs(qx-cx)), ady=Math.round(Math.abs(qy-cy));
+    return (adx<hs && Math.max(0,ady-hs)<=GAP) || (ady<hs && Math.max(0,adx-hs)<=GAP);
+  };
   for(let iter=0;iter<300;iter++){
     const dx=tx-cx, dy=ty-cy;
     const dist=Math.hypot(dx,dy);
@@ -1054,6 +1064,23 @@ function planTowerPlacement(srcX,srcY,srcType,srcR,tx,ty,al){
       const stepLen=maxStep*SAFE;
       px=Math.round(cx+ux*stepLen);
       py=Math.round(cy+uy*stepLen);
+    }
+    // 연결성 검증 + 보정 — Math.round로 경계 넘긴 경우 source 방향 1~2칸 당김
+    if(!isConnFromSrc(px,py)){
+      const sx=Math.sign(dx)||1, sy=Math.sign(dy)||1;
+      const cands=[
+        {x:px-sx,y:py},
+        {x:px,y:py-sy},
+        {x:px-sx,y:py-sy},
+        {x:px-2*sx,y:py-sy},
+        {x:px-sx,y:py-2*sy},
+        {x:px-2*sx,y:py},
+        {x:px,y:py-2*sy},
+        {x:px-2*sx,y:py-2*sy},
+      ];
+      for(const cd of cands){
+        if(isConnFromSrc(cd.x,cd.y)){ px=cd.x; py=cd.y; break; }
+      }
     }
     // 정체 감지 — 같은 좌표 반복이면 즉시 중단 (무한루프 방지)
     if(lastX!==null && px===lastX && py===lastY) break;
