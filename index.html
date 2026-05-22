@@ -1016,9 +1016,10 @@ function getMaxStep(dx,dy){
   const c2=Math.min(dyU>0.001?(TS-0.001)/dyU:INF, dxU>0.001?(TS+GAP)/dxU:INF);
   return Math.max(c1,c2);
 }
-// 헬기장→첫타워 최대 step — isConnToHelipad 조건 역산 (hs = TS/2 + helipadR/2)
-function getMaxStepFromHelipad(dx,dy,helipadR){
-  const hs=TS/2+(helipadR||15)/2;
+// 헬기장/도시 같은 zone(반지름 r)에서 다음 타워까지 최대 step
+// (isConnToHelipad / isTowerConnToCity 와 동일한 조건 역산: hs = TS/2 + r/2)
+function getMaxStepFromZone(dx,dy,zoneR){
+  const hs=TS/2+(zoneR||15)/2;
   const dist=Math.sqrt(dx*dx+dy*dy);
   if(dist<0.001) return hs+GAP;
   const dxU=Math.abs(dx)/dist, dyU=Math.abs(dy)/dist;
@@ -1026,6 +1027,58 @@ function getMaxStepFromHelipad(dx,dy,helipadR){
   const c1=Math.min(dxU>0.001?(hs-0.001)/dxU:INF, dyU>0.001?(hs+GAP)/dyU:INF);
   const c2=Math.min(dyU>0.001?(hs-0.001)/dyU:INF, dxU>0.001?(hs+GAP)/dxU:INF);
   return Math.max(c1,c2);
+}
+// 헬기장 별칭 (호환성)
+function getMaxStepFromHelipad(dx,dy,helipadR){ return getMaxStepFromZone(dx,dy,helipadR); }
+// 도시 다리 효과를 반영한 타워 배치 시뮬레이션
+// srcType: 'helipad' | 'tower' | 'city'  / srcR: helipad/city 반지름
+// 반환: [{x, y, throughCity: city|null}, ...]
+function planTowerPlacement(srcX,srcY,srcType,srcR,tx,ty,al){
+  const placed=[];
+  let cx=srcX, cy=srcY, ct=srcType, cr=srcR;
+  let lastBridgeId=null; // 직전에 다리한 도시 — 같은 도시 재진입 차단
+  let lastX=null, lastY=null; // 정체 감지
+  const SAFE=0.96;
+  for(let iter=0;iter<300;iter++){
+    const dx=tx-cx, dy=ty-cy;
+    const dist=Math.hypot(dx,dy);
+    if(dist<0.5) break;
+    let maxStep;
+    if(ct==='helipad'||ct==='city') maxStep=getMaxStepFromZone(dx,dy,cr);
+    else maxStep=getMaxStep(dx,dy);
+    let px,py,reached=false;
+    if(dist<=maxStep){
+      px=Math.round(tx); py=Math.round(ty); reached=true;
+    } else {
+      const ux=dx/dist, uy=dy/dist;
+      const stepLen=maxStep*SAFE;
+      px=Math.round(cx+ux*stepLen);
+      py=Math.round(cy+uy*stepLen);
+    }
+    // 정체 감지 — 같은 좌표 반복이면 즉시 중단 (무한루프 방지)
+    if(lastX!==null && px===lastX && py===lastY) break;
+    lastX=px; lastY=py;
+    // 직전 다리도시 제외하고 다른 도시 연결 확인
+    let bridge=null;
+    if(al){
+      for(const c of cities){
+        if(c.id===lastBridgeId) continue;
+        if(!isCityBridgeableBy(c,al)) continue;
+        if(isTowerConnToCity({x:px,y:py},c)){ bridge=c; break; }
+      }
+    }
+    placed.push({x:px,y:py,throughCity:bridge||null});
+    if(reached) break;
+    if(bridge){
+      cx=bridge.x+bridge.r/2; cy=bridge.y-bridge.r/2;
+      ct='city'; cr=bridge.r;
+      lastBridgeId=bridge.id;
+    } else {
+      cx=px; cy=py; ct='tower';
+      lastBridgeId=null;
+    }
+  }
+  return placed;
 }
 // 시작점→목표 사이에 필요한 타워 갯수 계산
 // fromHelipadR: 시작점이 헬기장인 경우 helipadR 값(기본 15), 아니면 null(타워-타워)
@@ -2199,23 +2252,21 @@ function loadTemplate(e){
 // cem: k 단위, buildMin: 분, startTowerCount: 현재 보유 탑 수
 // 도시 연결은 자동 감지 → 생산량 동적 증가
 function calcPath(sx,sy,tx,ty,cem,buildMin,startTowerCount,alIdx=null){
-  const d=Math.sqrt((tx-sx)**2+(ty-sy)**2);
-  const helipadR=(alIdx!=null && alliances[alIdx]?.helipad?.r)||15;
-  const fromHelipad=(startTowerCount===0); // 타워 0개 → 헬기장에서 시작
-  const n=calcTowerCountFor(sx,sy,tx,ty,fromHelipad?helipadR:null);
-  const towers=[]; let c=cem*1000, total=0;
-  const conn=new Set(); // 연결된 도시 인덱스
-  // 헬기장은 처음부터 연결 (sx,sy = 헬기장 위치)
-  checkCityConn(sx, sy, conn);
-  for(let i=0;i<n;i++){
-    const t=(i+1)/n, x=Math.round(sx+(tx-sx)*t), y=Math.round(sy+(ty-sy)*t);
-    const newC=checkCityConn(x,y,conn);
+  const al=alIdx!=null?alliances[alIdx]:null;
+  const helipadR=(al&&al.helipad?.r)||15;
+  const fromHelipad=(startTowerCount===0);
+  const positions=planTowerPlacement(sx,sy,fromHelipad?'helipad':'tower',helipadR,tx,ty,al);
+  let c=cem*1000, total=0;
+  const conn=new Set();
+  checkCityConn(sx,sy,conn);
+  const towers=positions.map((pt,i)=>{
+    const newC=checkCityConn(pt.x,pt.y,conn);
     const p=calcProdFromSet(conn,alIdx);
     const cost=getTowerCost(startTowerCount+i+1);
     const ca=c+p*buildMin, wait=Math.max(0,cost-ca)/p;
     total+=buildMin+wait; c=ca-cost+p*wait;
-    towers.push({num:startTowerCount+i+1,x,y,cost,wait,total,cem:c,prod:p,newCities:newC});
-  }
+    return {num:startTowerCount+i+1,x:pt.x,y:pt.y,cost,wait,total,cem:c,prod:p,newCities:newC,bridged:!!pt.throughCity};
+  });
   return {towers,total};
 }
 
@@ -2322,8 +2373,9 @@ function fullReset(){
 
 function findNearestTower(towers, x, y) {
   let best=-1, bestD=Infinity;
-  towers.forEach((t,i)=>{ const d=Math.abs(t.x-x)+Math.abs(t.y-y); if(d<bestD){bestD=d;best=i;} });
-  return bestD <= TS*3 ? best : -1; // 3타워 반경 이내
+  // 체비셰프 거리 — 타워(9×9) 사각형 안쪽 클릭만 hit으로 인정
+  towers.forEach((t,i)=>{ const d=Math.max(Math.abs(t.x-x),Math.abs(t.y-y)); if(d<bestD){bestD=d;best=i;} });
+  return bestD <= TS/2 ? best : -1; // 타워 한 변 절반 이내 (=4.5칸)
 }
 
 // ── 동맹 관계 탭 ──────────────────────────────────────
@@ -2689,7 +2741,8 @@ function calcRouteAt(rawX, rawY){
   const _al=alliances[activeIdx];
   const _fromHelipad=_al && _al.towers.length===0;
   const _hr=_al?_al.helipad.r:15;
-  const n=calcTowerCountFor(sx,sy,tx,ty,_fromHelipad?_hr:null);
+  const positions=planTowerPlacement(sx,sy,_fromHelipad?'helipad':'tower',_hr,tx,ty,_al);
+  const n=positions.length;
 
   const waypointCities=[];
   cities.forEach((c,ci)=>{
@@ -2707,17 +2760,14 @@ function calcRouteAt(rawX, rawY){
   const conn=new Set();
   checkCityConn(sx,sy,conn);
   let cem=al.cement*1000, total=0;
-  const steps=[];
-  for(let i=0;i<n;i++){
-    const frac=(i+1)/n;
-    const x=Math.round(sx+(tx-sx)*frac), y=Math.round(sy+(ty-sy)*frac);
-    const newC=checkCityConn(x,y,conn);
+  const steps=positions.map((pt,i)=>{
+    const newC=checkCityConn(pt.x,pt.y,conn);
     const p=calcProdFromSet(conn,activeIdx);
     const cost=getTowerCost(startCount+i+1);
     const ca=cem+p*effBm, wait=Math.max(0,cost-ca)/p;
     total+=effBm+wait; cem=ca-cost+p*wait;
-    steps.push({num:startCount+i+1,x,y,cost,wait,total,cem,prod:p,newCities:newC});
-  }
+    return {num:startCount+i+1,x:pt.x,y:pt.y,cost,wait,total,cem,prod:p,newCities:newC,bridged:!!pt.throughCity};
+  });
 
   const totalH=(total/60).toFixed(1);
   const skillActive=al.infraSkillEnd&&Date.now()<al.infraSkillEnd;
@@ -2788,22 +2838,27 @@ function calcWaypointRoute(){
   let cem=al.cement*1000, total=0, towerNum=startCount;
   const segments=[];
 
+  // 세그먼트 간 source 상태 추적 (도시 다리 효과가 다음 세그먼트까지 이어질 수 있음)
+  let segSrcType=(al.towers.length===0)?'helipad':'tower';
+  let segSrcR=al.helipad.r;
   waypoints.forEach((wp,wpi)=>{
     const tx=wp.x, ty=wp.y;
     const dist=Math.sqrt((tx-curX)**2+(ty-curY)**2);
-    // 첫 세그먼트이고 타워가 없을 때만 헬기장 시작 보너스 적용
-    const _fromHelipad=(wpi===0 && al.towers.length===0);
-    const n=calcTowerCountFor(curX,curY,tx,ty,_fromHelipad?al.helipad.r:null);
-    const steps=[];
-    for(let i=0;i<n;i++){
-      const frac=(i+1)/n;
-      const x=Math.round(curX+(tx-curX)*frac), y=Math.round(curY+(ty-curY)*frac);
-      const newC=checkCityConn(x,y,conn);
+    const positions=planTowerPlacement(curX,curY,segSrcType,segSrcR,tx,ty,al);
+    const steps=positions.map(pt=>{
+      const newC=checkCityConn(pt.x,pt.y,conn);
       const p=calcProdFromSet(conn,activeIdx);
       const cost=getTowerCost(towerNum+1);
       const ca=cem+p*effBm, wait=Math.max(0,cost-ca)/p;
       total+=effBm+wait; cem=ca-cost+p*wait; towerNum++;
-      steps.push({num:towerNum,x,y,cost,wait,total,cem,prod:p,newCities:newC});
+      return {num:towerNum,x:pt.x,y:pt.y,cost,wait,total,cem,prod:p,newCities:newC,bridged:!!pt.throughCity};
+    });
+    // 다음 세그먼트는 마지막 타워 위치에서 시작 — 도시 다리 효과 끝남
+    segSrcType='tower'; segSrcR=0;
+    // 단, 마지막 타워가 도시에 다리되어 있다면 다음 세그먼트는 그 도시에서 시작
+    if(positions.length>0 && positions[positions.length-1].throughCity){
+      const lastBridge=positions[positions.length-1].throughCity;
+      segSrcType='city'; segSrcR=lastBridge.r;
     }
     segments.push({wpi,steps,dist});
     curX=tx; curY=ty;
