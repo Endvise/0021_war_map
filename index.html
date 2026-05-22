@@ -1103,27 +1103,12 @@ function planTowerPlacement(srcX,srcY,srcType,srcR,tx,ty,al){
       // 평가 기준: 목표 방향 투영값(progression) 최대 (단순 거리가 아니라 "얼마나 전진했는가")
       const reach=ct==='tower'?13:16; // tower:12+여유, zone:15+여유
       const baseX=Math.round(cx), baseY=Math.round(cy);
-      // 도시·헬기장 영토 내부 배치 금지 — tower(9x9)가 zone(15x15) 내부와 겹치는 위치 차단
-      // 겹침 조건: |dx|<12 AND |dy|<12 (둘 다 strict — edge touch는 허용)
-      const isInsideRestrictedZone=(qx,qy)=>{
-        for(const c of cities){
-          const ccx=c.x+c.r/2, ccy=c.y-c.r/2;
-          if(Math.abs(qx-ccx)<12 && Math.abs(qy-ccy)<12) return true;
-        }
-        for(const al2 of alliances){
-          const h=al2.helipad;
-          const hcx=h.x+h.r/2, hcy=h.y-h.r/2;
-          if(Math.abs(qx-hcx)<12 && Math.abs(qy-hcy)<12) return true;
-        }
-        return false;
-      };
       let best=null, fallback=null;
       for(let ox=-reach;ox<=reach;ox++){
         for(let oy=-reach;oy<=reach;oy++){
           if(ox===0&&oy===0) continue;
           const qx=baseX+ox, qy=baseY+oy;
           if(!isConnFromSrc(qx,qy)) continue;
-          if(isInsideRestrictedZone(qx,qy)) continue; // 도시·헬기장 영토 내부 배치 차단
           const rdx=qx-cx, rdy=qy-cy;
           const d2=Math.hypot(rdx,rdy);
           if(d2<1) continue;
