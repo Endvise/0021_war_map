@@ -163,19 +163,21 @@ canvas#map{display:block;image-rendering:pixelated}
 .map-stage::after{top:8px;right:8px;border-width:1px 1px 0 0}
 /* 모드 힌트 핀 — 상단 중앙 */
 .modepill{
-  position:absolute;top:14px;left:50%;transform:translateX(-50%);
-  display:flex;align-items:center;gap:8px;
-  background:var(--bg1);border:1px solid var(--accent);
+  position:absolute;top:8px;left:50%;transform:translateX(-50%);
+  display:inline-flex;align-items:center;gap:5px;
+  background:rgba(9,14,24,.85);backdrop-filter:blur(6px);
+  border:1px solid var(--accent);
   color:var(--accent);border-radius:var(--r-pill);
-  padding:5px 14px 5px 6px;font-size:.72rem;font-weight:600;
-  box-shadow:0 0 0 4px var(--accent-soft),0 4px 14px rgba(0,0,0,.4);
+  padding:2px 9px 2px 2px;font-size:.62rem;font-weight:600;
+  box-shadow:0 0 0 2px var(--accent-soft);
   z-index:60;white-space:nowrap;
-  font-family:var(--font-ui);
+  font-family:var(--font-ui);opacity:.85;
+  pointer-events:none;
 }
 .modepill-ico{
-  display:inline-grid;place-items:center;width:20px;height:20px;
+  display:inline-grid;place-items:center;width:16px;height:16px;
   border-radius:50%;background:var(--accent);color:var(--accent-ink);
-  font-size:.8rem;
+  font-size:.7rem;
 }
 /* 줌 컨트롤 — 좌측 상단(헬프 핀과 안겹치게 좌측) */
 .zoomctl{
@@ -886,6 +888,32 @@ function findNearestWaypoint(x,y){
   waypoints.forEach((w,i)=>{const d=Math.hypot(w.x-x,w.y-y);if(d<bestD){bestD=d;best=i;}});
   return best;
 }
+// 경유지 스냅 — 가까운 타워/도시/헬기장 중심에 흡착
+function snapToNearestTarget(x,y){
+  const SNAP_DIST = TS * 1.5; // 약 13.5칸 내에서 스냅
+  let best=null, bestD=SNAP_DIST;
+  // 타워 (모든 연맹)
+  alliances.forEach(al=>{
+    al.towers.forEach(t=>{
+      const d=Math.hypot(t.x-x,t.y-y);
+      if(d<bestD){bestD=d; best={x:t.x,y:t.y,kind:'tower'};}
+    });
+  });
+  // 도시 중심
+  cities.forEach(c=>{
+    const ccx=c.x+c.r/2, ccy=c.y-c.r/2;
+    const d=Math.hypot(ccx-x,ccy-y);
+    if(d<bestD){bestD=d; best={x:Math.round(ccx*10)/10, y:Math.round(ccy*10)/10, kind:'city'};}
+  });
+  // 헬기장 중심
+  alliances.forEach(al=>{
+    const h=al.helipad;
+    const hcx=h.x+h.r/2, hcy=h.y-h.r/2;
+    const d=Math.hypot(hcx-x,hcy-y);
+    if(d<bestD){bestD=d; best={x:Math.round(hcx*10)/10, y:Math.round(hcy*10)/10, kind:'helipad'};}
+  });
+  return best || {x:Math.round(x), y:Math.round(y), kind:'free'};
+}
 
 const TOWER_DEFAULTS = { maxHp:7200, burnRatePerSec:5, burnDurationSec:900 };
 
@@ -987,6 +1015,31 @@ function getMaxStep(dx,dy){
   // cond2: dyU*s < TS AND dxU*s <= TS+GAP
   const c2=Math.min(dyU>0.001?(TS-0.001)/dyU:INF, dxU>0.001?(TS+GAP)/dxU:INF);
   return Math.max(c1,c2);
+}
+// 헬기장→첫타워 최대 step — isConnToHelipad 조건 역산 (hs = TS/2 + helipadR/2)
+function getMaxStepFromHelipad(dx,dy,helipadR){
+  const hs=TS/2+(helipadR||15)/2;
+  const dist=Math.sqrt(dx*dx+dy*dy);
+  if(dist<0.001) return hs+GAP;
+  const dxU=Math.abs(dx)/dist, dyU=Math.abs(dy)/dist;
+  const INF=1e9;
+  const c1=Math.min(dxU>0.001?(hs-0.001)/dxU:INF, dyU>0.001?(hs+GAP)/dyU:INF);
+  const c2=Math.min(dyU>0.001?(hs-0.001)/dyU:INF, dxU>0.001?(hs+GAP)/dxU:INF);
+  return Math.max(c1,c2);
+}
+// 시작점→목표 사이에 필요한 타워 갯수 계산
+// fromHelipadR: 시작점이 헬기장인 경우 helipadR 값(기본 15), 아니면 null(타워-타워)
+function calcTowerCountFor(sx,sy,tx,ty,fromHelipadR){
+  const dx=tx-sx, dy=ty-sy;
+  const dist=Math.sqrt(dx*dx+dy*dy);
+  if(dist<0.5) return 0;
+  const towerStep=getMaxStep(dx,dy);
+  if(fromHelipadR!=null){
+    const firstStep=getMaxStepFromHelipad(dx,dy,fromHelipadR);
+    if(dist<=firstStep) return 1;
+    return 1+Math.ceil((dist-firstStep)/towerStep);
+  }
+  return Math.ceil(dist/towerStep);
 }
 // 타워 ↔ 헬기장 연결
 // r=15 → center 소수점(X.5) + 정수 타워center = 반정수 dx → Math.round로 서브픽셀 오인 방지
@@ -1328,11 +1381,11 @@ function drawBlocks(towers, color, connectedSet=null){
 // ── 맵 오버레이 (modepill / zoom / status) ────────────────
 function updateModePill(){
   const cfg={
-    pointer:{ico:'🖱',txt:'일반 모드 — 드래그/우클릭 조작'},
-    build:  {ico:'🔨',txt:'건설 모드 — 클릭으로 타워 배치'},
-    demolish:{ico:'🔧',txt:'철거 모드 — 타워 클릭으로 삭제'},
-    ignite: {ico:'🔥',txt:'점화 모드 — 타워 클릭'},
-    route:  {ico:'🗺',txt:'경로 모드 — 우클릭으로 경유지 추가'}
+    pointer:{ico:'🖱',txt:'일반'},
+    build:  {ico:'🔨',txt:'건설'},
+    demolish:{ico:'🔧',txt:'철거'},
+    ignite: {ico:'🔥',txt:'점화'},
+    route:  {ico:'🗺',txt:'경로'}
   };
   const c=cfg[towerMode]||cfg.pointer;
   const ic=document.getElementById('modePillIco');
@@ -1750,9 +1803,8 @@ canvas.addEventListener('mousedown',e=>{
   }
   const raw=getRaw(e), hit=hitTest(raw.x,raw.y);
   if(hit){
-    const obj=hit.type==='helipad'?alliances[hit.idx].helipad:cities[hit.idx];
-    drag={...hit,offX:raw.x-obj.x,offY:raw.y-obj.y}; isDragging=false;
-    canvas.style.cursor='grabbing';
+    // 도시·헬기장은 고정 — 드래그 금지 (좌클릭 무시)
+    return;
   }
 });
 
@@ -1760,8 +1812,9 @@ canvas.addEventListener('mousemove',e=>{
   const raw=getRaw(e);
   if(towerMode==='route'){
     if(draggingWpIdx!==null){
-      waypoints[draggingWpIdx]={x:Math.round(raw.x),y:Math.round(raw.y)};
-      canvas.style.cursor='grabbing';
+      const snap=snapToNearestTarget(raw.x,raw.y);
+      waypoints[draggingWpIdx]={x:snap.x,y:snap.y};
+      canvas.style.cursor=snap.kind==='free'?'grabbing':'crosshair';
     } else {
       const wi=findNearestWaypoint(raw.x,raw.y);
       canvas.style.cursor=wi>=0?'grab':'crosshair';
@@ -1791,7 +1844,7 @@ canvas.addEventListener('mousemove',e=>{
     renderCfgTab(); renderCityList(); ghost=null;
   } else {
     const hit=hitTest(raw.x,raw.y);
-    canvas.style.cursor=terrainMode?'crosshair':hit?'grab':'crosshair';
+    canvas.style.cursor=terrainMode?'crosshair':hit?'not-allowed':'crosshair';
     ghost=terrainMode?null:getSnapped(e);
   }
   const g=ghost||getSnapped(e);
@@ -1866,7 +1919,10 @@ canvas.addEventListener('contextmenu',e=>{
   if(towerMode==='route'){
     const wi=findNearestWaypoint(raw.x,raw.y);
     if(wi>=0) waypoints.splice(wi,1);
-    else waypoints.push({x:Math.round(raw.x),y:Math.round(raw.y)});
+    else {
+      const snap=snapToNearestTarget(raw.x,raw.y);
+      waypoints.push({x:snap.x,y:snap.y});
+    }
     draw(); calcWaypointRoute(); return;
   }
   const hit=hitTest(raw.x,raw.y);
@@ -2143,7 +2199,10 @@ function loadTemplate(e){
 // cem: k 단위, buildMin: 분, startTowerCount: 현재 보유 탑 수
 // 도시 연결은 자동 감지 → 생산량 동적 증가
 function calcPath(sx,sy,tx,ty,cem,buildMin,startTowerCount,alIdx=null){
-  const d=Math.sqrt((tx-sx)**2+(ty-sy)**2), n=Math.ceil(d/getMaxStep(tx-sx,ty-sy));
+  const d=Math.sqrt((tx-sx)**2+(ty-sy)**2);
+  const helipadR=(alIdx!=null && alliances[alIdx]?.helipad?.r)||15;
+  const fromHelipad=(startTowerCount===0); // 타워 0개 → 헬기장에서 시작
+  const n=calcTowerCountFor(sx,sy,tx,ty,fromHelipad?helipadR:null);
   const towers=[]; let c=cem*1000, total=0;
   const conn=new Set(); // 연결된 도시 인덱스
   // 헬기장은 처음부터 연결 (sx,sy = 헬기장 위치)
@@ -2627,7 +2686,10 @@ function calcRouteAt(rawX, rawY){
 
   const tx=dest.x+dest.r/2, ty=dest.y-dest.r/2;
   const dist=Math.sqrt((tx-sx)**2+(ty-sy)**2);
-  const n=Math.ceil(dist/getMaxStep(tx-sx,ty-sy));
+  const _al=alliances[activeIdx];
+  const _fromHelipad=_al && _al.towers.length===0;
+  const _hr=_al?_al.helipad.r:15;
+  const n=calcTowerCountFor(sx,sy,tx,ty,_fromHelipad?_hr:null);
 
   const waypointCities=[];
   cities.forEach((c,ci)=>{
@@ -2729,7 +2791,9 @@ function calcWaypointRoute(){
   waypoints.forEach((wp,wpi)=>{
     const tx=wp.x, ty=wp.y;
     const dist=Math.sqrt((tx-curX)**2+(ty-curY)**2);
-    const n=Math.ceil(dist/getMaxStep(tx-curX,ty-curY));
+    // 첫 세그먼트이고 타워가 없을 때만 헬기장 시작 보너스 적용
+    const _fromHelipad=(wpi===0 && al.towers.length===0);
+    const n=calcTowerCountFor(curX,curY,tx,ty,_fromHelipad?al.helipad.r:null);
     const steps=[];
     for(let i=0;i<n;i++){
       const frac=(i+1)/n;
