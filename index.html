@@ -1042,15 +1042,15 @@ function getMaxStep(dx,dy){
   return Math.max(c1,c2);
 }
 // 헬기장/도시 같은 zone(반지름 r)에서 다음 타워까지 최대 step
-// (isConnToHelipad / isTowerConnToCity 와 동일한 조건 역산: hs = TS/2 + r/2)
+// (isConnToHelipad / isTowerConnToCity와 동일한 조건: 한 축 strict overlap, 다른 축 <= hs+GAP+0.5 leniency)
 function getMaxStepFromZone(dx,dy,zoneR){
   const hs=TS/2+(zoneR||15)/2;
   const dist=Math.sqrt(dx*dx+dy*dy);
-  if(dist<0.001) return hs+GAP;
+  if(dist<0.001) return hs+GAP+0.5;
   const dxU=Math.abs(dx)/dist, dyU=Math.abs(dy)/dist;
   const INF=1e9;
-  const c1=Math.min(dxU>0.001?(hs-0.001)/dxU:INF, dyU>0.001?(hs+GAP)/dyU:INF);
-  const c2=Math.min(dyU>0.001?(hs-0.001)/dyU:INF, dxU>0.001?(hs+GAP)/dxU:INF);
+  const c1=Math.min(dxU>0.001?(hs-0.001)/dxU:INF, dyU>0.001?(hs+GAP+0.5)/dyU:INF);
+  const c2=Math.min(dyU>0.001?(hs-0.001)/dyU:INF, dxU>0.001?(hs+GAP+0.5)/dxU:INF);
   return Math.max(c1,c2);
 }
 // 헬기장 별칭 (호환성)
@@ -1065,14 +1065,15 @@ function planTowerPlacement(srcX,srcY,srcType,srcR,tx,ty,al){
   let lastX=null, lastY=null; // 정체 감지
   const SAFE=0.94; // Math.round 경계 위반 방지 (45° 대각 등)
   // 현재 source(cx,cy,ct,cr)에서 (qx,qy)로 isConn/isConnToZone 검증
+  // helipad/city 경우 분수 중심 + 정수 타워 = 반정수 거리. +0.5 leniency 적용.
   const isConnFromSrc=(qx,qy)=>{
     if(ct==='tower'){
       const adx=Math.abs(qx-cx), ady=Math.abs(qy-cy);
       return (adx<TS && Math.max(0,ady-TS)<=GAP) || (ady<TS && Math.max(0,adx-TS)<=GAP);
     }
     const hs=TS/2+cr/2;
-    const adx=Math.round(Math.abs(qx-cx)), ady=Math.round(Math.abs(qy-cy));
-    return (adx<hs && Math.max(0,ady-hs)<=GAP) || (ady<hs && Math.max(0,adx-hs)<=GAP);
+    const adx=Math.abs(qx-cx), ady=Math.abs(qy-cy);
+    return (adx<hs && ady-hs<=GAP+0.5) || (ady<hs && adx-hs<=GAP+0.5);
   };
   for(let iter=0;iter<300;iter++){
     const dx=tx-cx, dy=ty-cy;
