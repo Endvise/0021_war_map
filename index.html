@@ -1056,30 +1056,60 @@ function planTowerPlacement(srcX,srcY,srcType,srcR,tx,ty,al){
     let maxStep;
     if(ct==='helipad'||ct==='city') maxStep=getMaxStepFromZone(dx,dy,cr);
     else maxStep=getMaxStep(dx,dy);
+    const ux=dx/dist, uy=dy/dist;
+    const sx=Math.sign(dx)||1, sy=Math.sign(dy)||1;
     let px,py,reached=false;
     if(dist<=maxStep){
+      // 목표 도달 — 마지막 타워를 목표에 배치
       px=Math.round(tx); py=Math.round(ty); reached=true;
+      // 연결성 검증 + 보정
+      if(!isConnFromSrc(px,py)){
+        const cands=[
+          {x:px-sx,y:py},{x:px,y:py-sy},{x:px-sx,y:py-sy},
+          {x:px-2*sx,y:py-sy},{x:px-sx,y:py-2*sy},
+          {x:px-2*sx,y:py},{x:px,y:py-2*sy},{x:px-2*sx,y:py-2*sy},
+        ];
+        for(const cd of cands){
+          if(isConnFromSrc(cd.x,cd.y)){ px=cd.x; py=cd.y; break; }
+        }
+      }
     } else {
-      const ux=dx/dist, uy=dy/dist;
-      const stepLen=maxStep*SAFE;
-      px=Math.round(cx+ux*stepLen);
-      py=Math.round(cy+uy*stepLen);
-    }
-    // 연결성 검증 + 보정 — Math.round로 경계 넘긴 경우 source 방향 1~2칸 당김
-    if(!isConnFromSrc(px,py)){
-      const sx=Math.sign(dx)||1, sy=Math.sign(dy)||1;
-      const cands=[
-        {x:px-sx,y:py},
-        {x:px,y:py-sy},
-        {x:px-sx,y:py-sy},
-        {x:px-2*sx,y:py-sy},
-        {x:px-sx,y:py-2*sy},
-        {x:px-2*sx,y:py},
-        {x:px,y:py-2*sy},
-        {x:px-2*sx,y:py-2*sy},
-      ];
+      // 전진 — 가능한 가장 먼 연결 정수 위치 탐색
+      const cands=[];
+      // SAFE 스케일 변화로 다양한 step 후보 시도
+      for(let s=1.0; s>=0.7; s-=0.03){
+        const stepLen=maxStep*s;
+        cands.push({x:Math.round(cx+ux*stepLen), y:Math.round(cy+uy*stepLen)});
+      }
+      // 직접 corner offset (tower-tower 코너 케이스 보강)
+      if(ct==='tower'){
+        const bX=Math.round(cx), bY=Math.round(cy);
+        [[8,12],[12,8],[8,11],[11,8],[10,10],[8,10],[10,8],[8,8]].forEach(([ox,oy])=>{
+          cands.push({x:bX+ox*sx, y:bY+oy*sy});
+        });
+      } else {
+        // helipad/city — hs=12, 가능 정수 (11,15)/(15,11) 같은 큰 step
+        const bX=Math.round(cx), bY=Math.round(cy);
+        [[11,15],[15,11],[11,14],[14,11],[11,11],[10,15],[15,10]].forEach(([ox,oy])=>{
+          cands.push({x:bX+ox*sx, y:bY+oy*sy});
+        });
+      }
+      // valid + 방향 정렬 + 최대 거리 후보 선택
+      let best=null;
       for(const cd of cands){
-        if(isConnFromSrc(cd.x,cd.y)){ px=cd.x; py=cd.y; break; }
+        if(!isConnFromSrc(cd.x,cd.y)) continue;
+        const ox=cd.x-cx, oy=cd.y-cy;
+        const d2=Math.hypot(ox,oy);
+        if(d2<1) continue;
+        const cosTheta=(ox*ux+oy*uy)/d2;
+        if(cosTheta<0.85) continue; // 30°↑ 벗어나면 제외
+        if(!best||d2>best.d) best={x:cd.x,y:cd.y,d:d2};
+      }
+      if(best){ px=best.x; py=best.y; }
+      else {
+        // 모든 후보 실패 — 안전망 (드물게 발생)
+        px=Math.round(cx+ux*maxStep*0.7);
+        py=Math.round(cy+uy*maxStep*0.7);
       }
     }
     // 정체 감지 — 같은 좌표 반복이면 즉시 중단 (무한루프 방지)
