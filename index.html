@@ -1939,6 +1939,20 @@ canvas.addEventListener('mousedown',e=>{
 
 canvas.addEventListener('mousemove',e=>{
   const raw=getRaw(e);
+  // 타워 이동 모드 — 타워가 커서 따라옴 (스냅 적용)
+  if(movingTower!==null){
+    const g=snapPos(raw.x,raw.y);
+    const al=alliances[movingTower.alIdx];
+    if(al && al.towers[movingTower.ti]){
+      al.towers[movingTower.ti].x=g.x;
+      al.towers[movingTower.ti].y=g.y;
+    }
+    canvas.style.cursor='move';
+    const _c=`(${g.x}, ${g.y})`;
+    document.getElementById('posBar').textContent='좌표: '+_c;
+    const _sc=document.getElementById('statCoord'); if(_sc) _sc.textContent=_c;
+    draw(); return;
+  }
   if(towerMode==='route'){
     if(draggingWpIdx!==null){
       const snap=snapToNearestTarget(raw.x,raw.y);
@@ -2044,10 +2058,16 @@ canvas.addEventListener('mouseup',e=>{
 canvas.addEventListener('mouseleave',()=>{drag={};isDragging=false;ghost=null;drawingTerrain=null;canvas.style.cursor='crosshair';draw();});
 canvas.addEventListener('contextmenu',e=>{
   e.preventDefault();
-  // 타워 이동 모드 중이면 우클릭으로 취소
+  // 타워 이동 모드 중이면 우클릭으로 취소 — 원래 위치 복구
   if(movingTower!==null){
+    const al=alliances[movingTower.alIdx];
+    if(al && al.towers[movingTower.ti]){
+      al.towers[movingTower.ti].x=movingTower.origX;
+      al.towers[movingTower.ti].y=movingTower.origY;
+    }
     movingTower=null;
     canvas.style.cursor='crosshair';
+    draw();
     return;
   }
   const raw=getRaw(e);
@@ -2111,8 +2131,8 @@ function showTowerMenu(al, alIdx, tIdx, px, py){
     al.cement=+(al.cement+refund).toFixed(1);
     al.towers.splice(tIdx,1);
   });
-  makeBtn(`📍 이동 <span style="font-size:.7rem;color:#aaa">(다음 좌클릭=새 위치)</span>`, '#0277bd', ()=>{
-    movingTower={alIdx,ti:tIdx};
+  makeBtn(`📍 이동 <span style="font-size:.7rem;color:#aaa">(커서 따라옴·클릭 확정·우클릭 취소)</span>`, '#0277bd', ()=>{
+    movingTower={alIdx,ti:tIdx,origX:t.x,origY:t.y};
     canvas.style.cursor='move';
   });
   makeBtn(`🗑 삭제 <span style="font-size:.7rem;color:#aaa">(반환 없음)</span>`, '#37474f', ()=>{
