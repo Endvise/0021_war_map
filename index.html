@@ -2812,11 +2812,19 @@ function calcWaypointRoute(){
   const totalH=(total/60).toFixed(1);
   const totalTowers=segments.reduce((s,g)=>s+g.steps.length,0);
 
+  // 적용 버튼이 참조할 평탄화 step 리스트 저장
+  window._lastWpSteps = segments.flatMap(g => g.steps.map(st => ({x:st.x, y:st.y, cost:st.cost})));
+  window._lastWpAlIdx = activeIdx;
+  const totalCost = window._lastWpSteps.reduce((s,st)=>s+(st.cost||0),0);
+
   let html=`<div style="background:#080e18;border-radius:6px;padding:10px;margin-bottom:8px">
     <div style="font-size:.75rem;color:${al.color};font-weight:700;margin-bottom:4px">
       ${al.name} — ${fromLabel} → 경유지 ${waypoints.length}개</div>
     ${skillActive?`<div style="font-size:.65rem;color:#fb923c;margin-bottom:3px">🏗 인프라스킬 활성 — 건설 ${effBm.toFixed(1)}분</div>`:''}
-    <div style="font-size:.7rem;color:#aaa">총 타워: <b style="color:#fff">${totalTowers}개</b> | 예상: <b style="color:#4ade80">${totalH}시간</b></div>
+    <div style="font-size:.7rem;color:#aaa">총 타워: <b style="color:#fff">${totalTowers}개</b> | 예상: <b style="color:#4ade80">${totalH}시간</b> | 비용: <b style="color:#ef9a9a">${(totalCost/1000).toFixed(0)}k</b></div>
+    <button class="btn btn-calc" onclick="applyWaypointRoute()"
+      data-tip="계산된 경로를 따라 타워를 자동 건설 (시멘트 차감)"
+      style="width:100%;margin-top:8px;padding:6px;font-size:.72rem;letter-spacing:.5px">🔨 이 경로대로 건설 (${totalTowers}개)</button>
   </div>`;
 
   segments.forEach((seg,si)=>{
@@ -2856,6 +2864,33 @@ function calcWaypointRoute(){
     `<div style="font-size:.62rem;color:#3a6080;margin-bottom:6px;font-family:'JetBrains Mono',monospace">🗺 경로모드 — 우클릭 경유지 추가/제거 · 드래그 이동</div>`+html;
   const resBtn=[...document.querySelectorAll('.tab')].find(t=>t.getAttribute('onclick')?.includes("'res'"));
   if(resBtn) showTab('res',resBtn);
+}
+
+// 경유지 계산 결과를 맵에 자동 건설로 적용
+function applyWaypointRoute(){
+  const steps=window._lastWpSteps;
+  const alIdx=window._lastWpAlIdx;
+  if(!steps||!steps.length){ alert('계산된 경로가 없습니다. 경유지를 먼저 지정해주세요.'); return; }
+  const al=alliances[alIdx];
+  if(!al){ alert('대상 연맹을 찾을 수 없습니다.'); return; }
+  const totalCost=steps.reduce((s,st)=>s+(st.cost||0),0);
+  const costK=(totalCost/1000).toFixed(1);
+  if(!confirm(`${steps.length}개 타워를 ${al.name}에 자동 건설합니다.\n총 비용: 시멘트 ${costK}k 차감\n현재 보유: ${al.cement}k\n\n계속하시겠습니까?`)) return;
+  const hpDefault=G('tTowerHp')||TOWER_DEFAULTS.maxHp;
+  steps.forEach(s=>{
+    al.towers.push({
+      x:s.x, y:s.y, status:'built',
+      hp:hpDefault, maxHp:hpDefault,
+      buildCost:s.cost
+    });
+    al.cement=+(al.cement-(s.cost/1000)).toFixed(1);
+  });
+  waypoints=[];
+  window._lastWpSteps=null;
+  setTowerMode('pointer');
+  renderCfgTab();
+  draw();
+  alert(`${steps.length}개 타워 건설 완료. 남은 시멘트: ${al.cement}k`);
 }
 
 function generateSatCoins(){
