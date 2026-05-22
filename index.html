@@ -1103,17 +1103,18 @@ function planTowerPlacement(srcX,srcY,srcType,srcR,tx,ty,al){
       // 평가 기준: 목표 방향 투영값(progression) 최대 (단순 거리가 아니라 "얼마나 전진했는가")
       const reach=ct==='tower'?13:16; // tower:12+여유, zone:15+여유
       const baseX=Math.round(cx), baseY=Math.round(cy);
-      // 도시·헬기장 영토 내부 배치 금지 (round 기반 — 게임 규칙과 동일)
-      // round(|dx|)<12 AND round(|dy|)<12 → 내부 (가장자리/bridge 위치는 round=12 이므로 통과)
+      // 타워 중심부 3x3가 도시·헬기장 15x15 영토 내부로 진입 금지
+      // 진입 조건: |dx|<9 AND |dy|<9 (city/helipad 반경 7.5 + 타워 중심 1.5 = 9)
+      // → 타워 외곽(가장자리)은 영토 안으로 들어와도 OK, 중심부만 침범 차단 → bridge 정상
       const isInsideRestrictedZone=(qx,qy)=>{
         for(const c of cities){
           const ccx=c.x+c.r/2, ccy=c.y-c.r/2;
-          if(Math.round(Math.abs(qx-ccx))<12 && Math.round(Math.abs(qy-ccy))<12) return true;
+          if(Math.abs(qx-ccx)<9 && Math.abs(qy-ccy)<9) return true;
         }
         for(const al2 of alliances){
           const h=al2.helipad;
           const hcx=h.x+h.r/2, hcy=h.y-h.r/2;
-          if(Math.round(Math.abs(qx-hcx))<12 && Math.round(Math.abs(qy-hcy))<12) return true;
+          if(Math.abs(qx-hcx)<9 && Math.abs(qy-hcy)<9) return true;
         }
         return false;
       };
