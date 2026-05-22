@@ -505,22 +505,45 @@ tr:hover td{background:oklch(0.82 0.15 195/.025)}
     <h3 style="color:#4ade80;font-size:.8rem;margin:12px 0 6px">🖱 맵 조작</h3>
     <table style="width:100%;border-collapse:collapse;margin-bottom:12px">
       <tr style="background:#111827"><td style="padding:3px 8px;border:1px solid #1a2e50;color:#a8d8ff">왼쪽 클릭</td><td style="padding:3px 8px;border:1px solid #1a2e50">현재 모드로 타워 건설·철거·점화</td></tr>
-      <tr><td style="padding:3px 8px;border:1px solid #1a2e50;color:#a8d8ff">우클릭</td><td style="padding:3px 8px;border:1px solid #1a2e50">경로 모드: 경유지 추가/삭제 / 도시: 소유권 변경</td></tr>
-      <tr style="background:#111827"><td style="padding:3px 8px;border:1px solid #1a2e50;color:#a8d8ff">마우스 휠</td><td style="padding:3px 8px;border:1px solid #1a2e50">줌인·줌아웃</td></tr>
-      <tr><td style="padding:3px 8px;border:1px solid #1a2e50;color:#a8d8ff">휠 클릭 드래그</td><td style="padding:3px 8px;border:1px solid #1a2e50">맵 뷰 이동</td></tr>
-      <tr style="background:#111827"><td style="padding:3px 8px;border:1px solid #1a2e50;color:#a8d8ff">타워 드래그</td><td style="padding:3px 8px;border:1px solid #1a2e50">타워 위치 이동</td></tr>
+      <tr><td style="padding:3px 8px;border:1px solid #1a2e50;color:#a8d8ff">우클릭(타워)</td><td style="padding:3px 8px;border:1px solid #1a2e50">컨텍스트 메뉴: 🔥 점화 · 🔧 철거(반환) · 📍 이동 · 🗑 삭제(반환없음)</td></tr>
+      <tr style="background:#111827"><td style="padding:3px 8px;border:1px solid #1a2e50;color:#a8d8ff">우클릭(도시)</td><td style="padding:3px 8px;border:1px solid #1a2e50">소유권 직접 지정 메뉴</td></tr>
+      <tr><td style="padding:3px 8px;border:1px solid #1a2e50;color:#a8d8ff">우클릭(헬기장)</td><td style="padding:3px 8px;border:1px solid #1a2e50">연맹 관계 토글 기준점 (재우클릭=해제)</td></tr>
+      <tr style="background:#111827"><td style="padding:3px 8px;border:1px solid #1a2e50;color:#a8d8ff">마우스 휠</td><td style="padding:3px 8px;border:1px solid #1a2e50">줌인·줌아웃 (좌상단 줌 버튼도 가능)</td></tr>
+      <tr><td style="padding:3px 8px;border:1px solid #1a2e50;color:#a8d8ff">미니맵 클릭</td><td style="padding:3px 8px;border:1px solid #1a2e50">우하단 미니맵 클릭 → 해당 위치로 점프</td></tr>
+    </table>
+
+    <h3 style="color:#fbbf24;font-size:.8rem;margin:12px 0 6px">🗺 경로 모드 (출발·도착·경유지)</h3>
+    <table style="width:100%;border-collapse:collapse;margin-bottom:12px">
+      <tr style="background:#111827"><td style="padding:3px 8px;border:1px solid #1a2e50;color:#22c55e;white-space:nowrap">🚩 첫 점</td><td style="padding:3px 8px;border:1px solid #1a2e50">출발점 — 헬기장/도시/타워 자동 판정 (스냅됨)</td></tr>
+      <tr><td style="padding:3px 8px;border:1px solid #1a2e50;color:#ef4444">🏁 마지막 점</td><td style="padding:3px 8px;border:1px solid #1a2e50">도착점</td></tr>
+      <tr style="background:#111827"><td style="padding:3px 8px;border:1px solid #1a2e50;color:#f59e0b">🏴 중간 점</td><td style="padding:3px 8px;border:1px solid #1a2e50">경유지 — 순서대로 거쳐갈 위치</td></tr>
+      <tr><td style="padding:3px 8px;border:1px solid #1a2e50">우클릭</td><td style="padding:3px 8px;border:1px solid #1a2e50">새 점 추가 (자동으로 가까운 앵커에 스냅)</td></tr>
+      <tr style="background:#111827"><td style="padding:3px 8px;border:1px solid #1a2e50">기존 점 우클릭</td><td style="padding:3px 8px;border:1px solid #1a2e50">해당 점 제거</td></tr>
+      <tr><td style="padding:3px 8px;border:1px solid #1a2e50">점 드래그</td><td style="padding:3px 8px;border:1px solid #1a2e50">점 위치 변경 (드래그 중에도 스냅)</td></tr>
+    </table>
+
+    <h3 style="color:#22d3ee;font-size:.8rem;margin:12px 0 6px">🔮 미래 예측 모드</h3>
+    <p style="margin:0 0 6px;color:#aaa">경로 계산 시 만들어질 미래 타워가 <b style="color:#22d3ee">점선 박스</b>로 맵에 미리 표시됩니다.</p>
+    <table style="width:100%;border-collapse:collapse;margin-bottom:12px">
+      <tr style="background:#111827"><td style="padding:3px 8px;border:1px solid #1a2e50;color:#a8d8ff">점선 박스</td><td style="padding:3px 8px;border:1px solid #1a2e50">아직 건설되지 않은 미래 타워 (예측)</td></tr>
+      <tr><td style="padding:3px 8px;border:1px solid #1a2e50;color:#a8d8ff">솔리드 박스로 전환</td><td style="padding:3px 8px;border:1px solid #1a2e50">UTC 도달 시간이 지나면 자동으로 일반 타워 박스로 전환</td></tr>
+      <tr style="background:#111827"><td style="padding:3px 8px;border:1px solid #1a2e50;color:#a8d8ff">호버 툴팁</td><td style="padding:3px 8px;border:1px solid #1a2e50">UTC 도달 시간 + 누적 시멘트 비용 + 도시 다리 여부</td></tr>
+      <tr><td style="padding:3px 8px;border:1px solid #1a2e50;color:#a8d8ff">🏙 표시</td><td style="padding:3px 8px;border:1px solid #1a2e50">해당 타워가 도시를 다리로 이용하는 지점</td></tr>
+      <tr style="background:#111827"><td style="padding:3px 8px;border:1px solid #1a2e50;color:#a8d8ff">🔨 이 경로대로 건설</td><td style="padding:3px 8px;border:1px solid #1a2e50">📊 탭 결과의 버튼 — 시멘트 차감 + 즉시 일괄 건설</td></tr>
     </table>
 
     <h3 style="color:#4ade80;font-size:.8rem;margin:12px 0 6px">🔘 헤더 버튼</h3>
     <table style="width:100%;border-collapse:collapse;margin-bottom:12px">
-      <tr style="background:#111827"><td style="padding:3px 8px;border:1px solid #1a2e50;color:#a8d8ff;white-space:nowrap">🔨 건설</td><td style="padding:3px 8px;border:1px solid #1a2e50">클릭 위치에 타워 건설 (시멘트 소모)</td></tr>
-      <tr><td style="padding:3px 8px;border:1px solid #1a2e50;color:#a8d8ff">🔧 철거</td><td style="padding:3px 8px;border:1px solid #1a2e50">타워 클릭으로 즉시 삭제</td></tr>
-      <tr style="background:#111827"><td style="padding:3px 8px;border:1px solid #1a2e50;color:#a8d8ff">🔥 점화</td><td style="padding:3px 8px;border:1px solid #1a2e50">타워 클릭 → 내구도 초당 감소 시작</td></tr>
-      <tr><td style="padding:3px 8px;border:1px solid #1a2e50;color:#a8d8ff">↩ 취소</td><td style="padding:3px 8px;border:1px solid #1a2e50">마지막 건설 타워 삭제</td></tr>
-      <tr style="background:#111827"><td style="padding:3px 8px;border:1px solid #1a2e50;color:#a8d8ff">🗺 경로</td><td style="padding:3px 8px;border:1px solid #1a2e50">경유지 깃발 모드 — 우클릭 추가, 재우클릭 삭제, 드래그 이동</td></tr>
+      <tr style="background:#111827"><td style="padding:3px 8px;border:1px solid #1a2e50;color:#a8d8ff;white-space:nowrap">🖱 일반</td><td style="padding:3px 8px;border:1px solid #1a2e50">맵 탐색 전용 (건설/철거/점화 없음)</td></tr>
+      <tr><td style="padding:3px 8px;border:1px solid #1a2e50;color:#a8d8ff">🔨 건설</td><td style="padding:3px 8px;border:1px solid #1a2e50">클릭 위치에 타워 건설 (시멘트 소모)</td></tr>
+      <tr style="background:#111827"><td style="padding:3px 8px;border:1px solid #1a2e50;color:#a8d8ff">🔧 철거</td><td style="padding:3px 8px;border:1px solid #1a2e50">타워 클릭으로 즉시 삭제 (시멘트 50% 반환)</td></tr>
+      <tr><td style="padding:3px 8px;border:1px solid #1a2e50;color:#a8d8ff">🔥 점화</td><td style="padding:3px 8px;border:1px solid #1a2e50">타워 클릭 → 내구도 초당 감소 시작</td></tr>
+      <tr style="background:#111827"><td style="padding:3px 8px;border:1px solid #1a2e50;color:#a8d8ff">↩ 취소</td><td style="padding:3px 8px;border:1px solid #1a2e50">마지막 건설 타워 삭제</td></tr>
+      <tr><td style="padding:3px 8px;border:1px solid #1a2e50;color:#a8d8ff">▶ 계산</td><td style="padding:3px 8px;border:1px solid #1a2e50">모든 연맹 경로·도달 시간 계산 → 📊 결과 탭</td></tr>
+      <tr style="background:#111827"><td style="padding:3px 8px;border:1px solid #1a2e50;color:#a8d8ff">🗺 경로</td><td style="padding:3px 8px;border:1px solid #1a2e50">경유지 모드 — 출발 🚩 / 도착 🏁 / 경유 🏴 우클릭 지정 → 미래 예측 자동 표시</td></tr>
       <tr><td style="padding:3px 8px;border:1px solid #1a2e50;color:#a8d8ff">🤝 동맹 설정</td><td style="padding:3px 8px;border:1px solid #1a2e50">헬기장 클릭으로 동맹 연맹 선택 → ✓ 완료</td></tr>
       <tr style="background:#111827"><td style="padding:3px 8px;border:1px solid #1a2e50;color:#a8d8ff">🏆 랭킹</td><td style="padding:3px 8px;border:1px solid #1a2e50">현재 점수 기준 순위표 팝업</td></tr>
-      <tr><td style="padding:3px 8px;border:1px solid #1a2e50;color:#a8d8ff">🗑 초기화</td><td style="padding:3px 8px;border:1px solid #1a2e50">전체 데이터 삭제 + 새로고침</td></tr>
+      <tr><td style="padding:3px 8px;border:1px solid #1a2e50;color:#a8d8ff">🗑 초기화</td><td style="padding:3px 8px;border:1px solid #1a2e50">전체 데이터 삭제 + 새로고침 (Firebase 룸 상태도 함께 정리)</td></tr>
     </table>
 
     <h3 style="color:#4ade80;font-size:.8rem;margin:12px 0 6px">📡 실시간 동기화 (전장코드)</h3>
@@ -1615,20 +1638,31 @@ function drawGhost(){
 function drawPreviewTowers(){
   if(!previewTowers.length) return;
   ctx.save();
+  const now=Date.now();
   previewTowers.forEach((pt,i)=>{
     const {cx,cy}=toC(pt.x,pt.y), s=TS*ppc;
     const isHover=(i===previewHoverIdx);
-    // 점선 박스
-    ctx.setLineDash([3,2]);
-    ctx.fillStyle=pt.color+(isHover?'2a':'15');
-    ctx.fillRect(cx-s/2,cy-s/2,s,s);
-    ctx.strokeStyle=pt.color+(isHover?'ff':'aa');
-    ctx.lineWidth=isHover?2:1.2;
-    ctx.strokeRect(cx-s/2,cy-s/2,s,s);
-    ctx.setLineDash([]);
+    const isBuilt=now>=pt.arrival; // UTC 도달 시 솔리드 박스로 전환
+    if(isBuilt){
+      // 도달 — 솔리드 박스 (실제 건설된 타워처럼)
+      ctx.fillStyle=pt.color+(isHover?'cc':'aa');
+      ctx.fillRect(cx-s/2,cy-s/2,s,s);
+      ctx.strokeStyle=pt.color+'ff';
+      ctx.lineWidth=isHover?2:1.5;
+      ctx.strokeRect(cx-s/2,cy-s/2,s,s);
+    } else {
+      // 예측 — 점선 박스
+      ctx.setLineDash([3,2]);
+      ctx.fillStyle=pt.color+(isHover?'2a':'15');
+      ctx.fillRect(cx-s/2,cy-s/2,s,s);
+      ctx.strokeStyle=pt.color+(isHover?'ff':'aa');
+      ctx.lineWidth=isHover?2:1.2;
+      ctx.strokeRect(cx-s/2,cy-s/2,s,s);
+      ctx.setLineDash([]);
+    }
     // 번호
     if(ppc>=2){
-      ctx.fillStyle=pt.color+'dd';
+      ctx.fillStyle=isBuilt?'#fff':(pt.color+'dd');
       ctx.font=`bold ${Math.max(7,ppc*1.5)}px "Space Mono",monospace`;
       ctx.textAlign='center'; ctx.textBaseline='middle';
       ctx.fillText('#'+pt.num,cx,cy);
@@ -1642,6 +1676,8 @@ function drawPreviewTowers(){
   });
   ctx.restore();
 }
+// 미래 예측 타워가 UTC 도달 시점에 점선→솔리드 전환되도록 주기 리프레시
+setInterval(()=>{ if(previewTowers.length>0) draw(); }, 15000);
 
 function showPreviewTooltip(pt,clientX,clientY){
   let el=document.getElementById('previewTooltip');
