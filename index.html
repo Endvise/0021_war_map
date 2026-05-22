@@ -1562,56 +1562,74 @@ function drawGhost(){
 }
 
 // ── 경유지 깃발 ──────────────────────────────────────────
+// ── 경유지 깃발 (첫=출발 / 마지막=도착 / 중간=경유) ─────────────
 function drawWaypoints(){
   if(!waypoints.length) return;
   ctx.save();
-  // 출발점 → 첫 경유지 연결선
-  const al=alliances[activeIdx];
-  if(al){
-    let sx,sy;
-    if(al.towers.length>0){const lt=al.towers[al.towers.length-1];sx=lt.x;sy=lt.y;}
-    else{sx=al.helipad.x+al.helipad.r/2;sy=al.helipad.y-al.helipad.r/2;}
-    const {cx:ocx,cy:ocy}=toC(sx,sy);
-    const {cx:fcx,cy:fcy}=toC(waypoints[0].x,waypoints[0].y);
-    ctx.strokeStyle='rgba(96,165,250,0.3)';
-    ctx.lineWidth=1.5; ctx.setLineDash([3,4]);
-    ctx.beginPath(); ctx.moveTo(ocx,ocy); ctx.lineTo(fcx,fcy); ctx.stroke();
-    ctx.setLineDash([]);
+  const N=waypoints.length;
+  // 점들을 연결하는 선
+  if(N>=2){
+    ctx.strokeStyle='rgba(245,158,11,0.55)';
+    ctx.lineWidth=1.5; ctx.setLineDash([5,3]);
+    ctx.beginPath();
+    waypoints.forEach((w,i)=>{
+      const {cx,cy}=toC(w.x,w.y);
+      if(i===0) ctx.moveTo(cx,cy); else ctx.lineTo(cx,cy);
+    });
+    ctx.stroke(); ctx.setLineDash([]);
   }
-  // 경유지 간 연결선
-  ctx.strokeStyle='rgba(96,165,250,0.5)';
-  ctx.lineWidth=1.5; ctx.setLineDash([5,3]);
-  ctx.beginPath();
-  waypoints.forEach((w,i)=>{
-    const {cx,cy}=toC(w.x,w.y);
-    if(i===0) ctx.moveTo(cx,cy); else ctx.lineTo(cx,cy);
-  });
-  ctx.stroke(); ctx.setLineDash([]);
   // 깃발 개별 렌더
   waypoints.forEach((w,i)=>{
     const {cx,cy}=toC(w.x,w.y);
     const isDrag=draggingWpIdx===i;
+    const isStart=(i===0);
+    const isEnd=(i===N-1 && N>=2);
+    const isMid=!isStart && !isEnd;
+    // 역할별 색
+    let color, label;
+    if(isStart){ color=isDrag?'#86efac':'#22c55e'; label='S'; }
+    else if(isEnd){ color=isDrag?'#fca5a5':'#ef4444'; label='E'; }
+    else { color=isDrag?'#fcd34d':'#f59e0b'; label=String(i); }
     // 폴대
-    ctx.strokeStyle=isDrag?'#93c5fd':'#60a5fa';
-    ctx.lineWidth=1.5;
-    ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(cx,cy-ppc*5); ctx.stroke();
-    // 깃발 삼각형
-    ctx.fillStyle=isDrag?'#93c5fd':'#60a5fa';
-    ctx.beginPath();
-    ctx.moveTo(cx,cy-ppc*5);
-    ctx.lineTo(cx+ppc*3,cy-ppc*3.5);
-    ctx.lineTo(cx,cy-ppc*2);
-    ctx.closePath(); ctx.fill();
-    // 번호
-    if(ppc>=2){
+    ctx.strokeStyle=color; ctx.lineWidth=1.6;
+    ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(cx,cy-ppc*5.5); ctx.stroke();
+    // 깃발 (출발=녹색사각 / 도착=체크무늬 / 경유=삼각형)
+    ctx.fillStyle=color;
+    if(isStart){
+      // 녹색 사각 깃발
+      ctx.fillRect(cx,cy-ppc*5.5,ppc*3.2,ppc*2.2);
+    } else if(isEnd){
+      // 빨강 체크무늬 깃발
+      ctx.fillRect(cx,cy-ppc*5.5,ppc*3.2,ppc*2.2);
+      // 체크무늬
       ctx.fillStyle='#fff';
-      ctx.font=`bold ${Math.max(8,ppc*1.5)}px JetBrains Mono,monospace`;
-      ctx.textAlign='center'; ctx.textBaseline='middle';
-      ctx.fillText(i+1, cx+ppc*1.5, cy-ppc*3.5);
+      const cw=ppc*0.8;
+      for(let r=0;r<3;r++) for(let c=0;c<4;c++){
+        if((r+c)%2===0) ctx.fillRect(cx+c*cw,cy-ppc*5.5+r*cw,cw,cw);
+      }
+    } else {
+      ctx.beginPath();
+      ctx.moveTo(cx,cy-ppc*5.5);
+      ctx.lineTo(cx+ppc*3.2,cy-ppc*4);
+      ctx.lineTo(cx,cy-ppc*2.5);
+      ctx.closePath(); ctx.fill();
     }
-    // 기준점 점
-    ctx.fillStyle='#60a5fa';
-    ctx.beginPath(); ctx.arc(cx,cy,ppc*1.2,0,Math.PI*2); ctx.fill();
+    // 라벨 (S/E/숫자)
+    if(ppc>=2){
+      ctx.fillStyle=isStart||isEnd?'#fff':'#000';
+      if(isEnd){ ctx.fillStyle=color; }
+      ctx.font=`bold ${Math.max(8,ppc*1.6)}px "Space Mono",monospace`;
+      ctx.textAlign='center'; ctx.textBaseline='middle';
+      if(isMid) ctx.fillText(label, cx+ppc*1.6, cy-ppc*4);
+    }
+    // 기준점 원
+    ctx.fillStyle=color;
+    ctx.beginPath(); ctx.arc(cx,cy,ppc*1.3,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#fff';
+    if(ppc>=2){
+      ctx.font=`bold ${Math.max(6,ppc*1.1)}px "Space Mono",monospace`;
+      ctx.fillText(label, cx, cy);
+    }
   });
   ctx.restore();
 }
@@ -2817,31 +2835,57 @@ function calcRouteAt(rawX, rawY){
 }
 
 function calcWaypointRoute(){
-  if(!waypoints.length) return;
+  // 최소 2개 (출발+도착) 필요
+  if(waypoints.length<2){
+    const msg=waypoints.length===0
+      ? '🗺 경로 모드 — 우클릭으로 점 추가<br><span style="color:#888;font-size:.62rem">첫 점 = 🚩 출발 / 마지막 점 = 🏁 도착 / 중간 = 🏴 경유</span>'
+      : '🚩 출발점만 지정됨 — 🏁 도착점도 우클릭으로 추가하세요';
+    document.getElementById('tabRes').innerHTML=
+      `<div style="font-size:.7rem;color:#aaa;padding:14px;text-align:center;background:#080e18;border-radius:6px;line-height:1.5">${msg}</div>`;
+    window._lastWpSteps=null;
+    return;
+  }
   const al=alliances[activeIdx]; if(!al) return;
   const bm=G('tBuildMin')||23;
   const effBm=getEffBuildMin(al,bm);
 
-  // 출발점
-  let curX,curY,startCount,fromLabel;
-  if(al.towers.length>0){
-    const lt=al.towers[al.towers.length-1];
-    curX=lt.x; curY=lt.y; startCount=al.towers.length; fromLabel=`타워 #${al.towers.length}`;
+  // 출발점은 waypoints[0]. 그게 어느 앵커(헬기장/도시/타워)인지 자동 판정
+  const startWp=waypoints[0];
+  let curX=startWp.x, curY=startWp.y;
+  let segSrcType='tower', segSrcR=0;
+  let fromLabel=`🚩 (${startWp.x},${startWp.y})`;
+  const hcx=al.helipad.x+al.helipad.r/2, hcy=al.helipad.y-al.helipad.r/2;
+  if(Math.hypot(startWp.x-hcx,startWp.y-hcy)<1.5){
+    segSrcType='helipad'; segSrcR=al.helipad.r; fromLabel='🚁 헬기장';
   } else {
-    curX=al.helipad.x+al.helipad.r/2; curY=al.helipad.y-al.helipad.r/2;
-    startCount=0; fromLabel='헬기장';
+    for(const c of cities){
+      const ccx=c.x+c.r/2, ccy=c.y-c.r/2;
+      if(Math.hypot(startWp.x-ccx,startWp.y-ccy)<1.5){
+        segSrcType='city'; segSrcR=c.r; fromLabel=`🏙 ${c.label||'도시'}`;
+        break;
+      }
+    }
+    if(segSrcType==='tower'){
+      const ti=al.towers.findIndex(t=>Math.abs(t.x-startWp.x)<1.5&&Math.abs(t.y-startWp.y)<1.5);
+      if(ti>=0){ fromLabel=`🔨 타워 #${ti+1}`; }
+    }
   }
+  // 출발 이후의 점들 = 도착·경유지
+  const stopWps=waypoints.slice(1);
 
   const skillActive=al.infraSkillEnd&&Date.now()<al.infraSkillEnd;
   const conn=new Set();
   checkCityConn(curX,curY,conn);
-  let cem=al.cement*1000, total=0, towerNum=startCount;
+  let cem=al.cement*1000, total=0;
+  // towerNum 기준: helipad/도시 출발이면 0, 타워 출발이면 그 타워 번호
+  let towerNum=0;
+  if(segSrcType==='tower' && fromLabel.startsWith('🔨')){
+    const m=fromLabel.match(/#(\d+)/);
+    if(m) towerNum=+m[1];
+  }
   const segments=[];
 
-  // 세그먼트 간 source 상태 추적 (도시 다리 효과가 다음 세그먼트까지 이어질 수 있음)
-  let segSrcType=(al.towers.length===0)?'helipad':'tower';
-  let segSrcR=al.helipad.r;
-  waypoints.forEach((wp,wpi)=>{
+  stopWps.forEach((wp,wpi)=>{
     const tx=wp.x, ty=wp.y;
     const dist=Math.sqrt((tx-curX)**2+(ty-curY)**2);
     const positions=planTowerPlacement(curX,curY,segSrcType,segSrcR,tx,ty,al);
@@ -2860,7 +2904,7 @@ function calcWaypointRoute(){
       const lastBridge=positions[positions.length-1].throughCity;
       segSrcType='city'; segSrcR=lastBridge.r;
     }
-    segments.push({wpi,steps,dist});
+    segments.push({wpi,steps,dist,isLast:wpi===stopWps.length-1});
     curX=tx; curY=ty;
   });
 
@@ -2872,9 +2916,11 @@ function calcWaypointRoute(){
   window._lastWpAlIdx = activeIdx;
   const totalCost = window._lastWpSteps.reduce((s,st)=>s+(st.cost||0),0);
 
+  const endWp=waypoints[waypoints.length-1];
+  const stopCount=stopWps.length-1; // 도착 제외 중간 경유지 수
   let html=`<div style="background:#080e18;border-radius:6px;padding:10px;margin-bottom:8px">
     <div style="font-size:.75rem;color:${al.color};font-weight:700;margin-bottom:4px">
-      ${al.name} — ${fromLabel} → 경유지 ${waypoints.length}개</div>
+      ${al.name} — ${fromLabel} → 🏁 (${endWp.x},${endWp.y})${stopCount>0?` <span style="color:#888;font-weight:400">(경유 ${stopCount}개)</span>`:''}</div>
     ${skillActive?`<div style="font-size:.65rem;color:#fb923c;margin-bottom:3px">🏗 인프라스킬 활성 — 건설 ${effBm.toFixed(1)}분</div>`:''}
     <div style="font-size:.7rem;color:#aaa">총 타워: <b style="color:#fff">${totalTowers}개</b> | 예상: <b style="color:#4ade80">${totalH}시간</b> | 비용: <b style="color:#ef9a9a">${(totalCost/1000).toFixed(0)}k</b></div>
     <button class="btn btn-calc" onclick="applyWaypointRoute()"
@@ -2885,8 +2931,10 @@ function calcWaypointRoute(){
   segments.forEach((seg,si)=>{
     if(!seg.steps.length) return;
     const segTotalH=(seg.steps[seg.steps.length-1].total/60).toFixed(1);
-    html+=`<div style="font-size:.68rem;color:#60a5fa;margin:6px 0 3px;font-weight:700">
-      🏴 경유지 ${si+1} &nbsp;<span style="color:#3a6080;font-weight:400">거리 ${seg.dist.toFixed(0)}칸 · 누적 ${segTotalH}h</span>
+    const segIcon=seg.isLast?'🏁 도착':(`🏴 경유지 ${si+1}`);
+    const segColor=seg.isLast?'#ef4444':'#f59e0b';
+    html+=`<div style="font-size:.68rem;color:${segColor};margin:6px 0 3px;font-weight:700">
+      ${segIcon} &nbsp;<span style="color:#3a6080;font-weight:400">거리 ${seg.dist.toFixed(0)}칸 · 누적 ${segTotalH}h</span>
     </div>
     <div style="overflow-x:auto;margin-bottom:6px">
     <table style="width:100%;border-collapse:collapse;font-size:.63rem">
@@ -2916,7 +2964,7 @@ function calcWaypointRoute(){
   });
 
   document.getElementById('tabRes').innerHTML=
-    `<div style="font-size:.62rem;color:#3a6080;margin-bottom:6px;font-family:'JetBrains Mono',monospace">🗺 경로모드 — 우클릭 경유지 추가/제거 · 드래그 이동</div>`+html;
+    `<div style="font-size:.62rem;color:#3a6080;margin-bottom:6px;font-family:'Space Mono',monospace">🗺 우클릭: 점 추가 (첫=🚩출발 · 마지막=🏁도착 · 중간=🏴경유) · 드래그 이동 · 기존 점 우클릭=제거</div>`+html;
   const resBtn=[...document.querySelectorAll('.tab')].find(t=>t.getAttribute('onclick')?.includes("'res'"));
   if(resBtn) showTab('res',resBtn);
 }
@@ -2925,7 +2973,7 @@ function calcWaypointRoute(){
 function applyWaypointRoute(){
   const steps=window._lastWpSteps;
   const alIdx=window._lastWpAlIdx;
-  if(!steps||!steps.length){ alert('계산된 경로가 없습니다. 경유지를 먼저 지정해주세요.'); return; }
+  if(!steps||!steps.length){ alert('계산된 경로가 없습니다.\n🚩 출발점과 🏁 도착점을 우클릭으로 지정해주세요 (최소 2개).'); return; }
   const al=alliances[alIdx];
   if(!al){ alert('대상 연맹을 찾을 수 없습니다.'); return; }
   const totalCost=steps.reduce((s,st)=>s+(st.cost||0),0);
