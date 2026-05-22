@@ -1074,40 +1074,27 @@ function planTowerPlacement(srcX,srcY,srcType,srcR,tx,ty,al){
         }
       }
     } else {
-      // 전진 — 가능한 가장 먼 연결 정수 위치 탐색
-      const cands=[];
-      // SAFE 스케일 변화로 다양한 step 후보 시도
-      for(let s=1.0; s>=0.7; s-=0.03){
-        const stepLen=maxStep*s;
-        cands.push({x:Math.round(cx+ux*stepLen), y:Math.round(cy+uy*stepLen)});
-      }
-      // 직접 corner offset (tower-tower 코너 케이스 보강)
-      if(ct==='tower'){
-        const bX=Math.round(cx), bY=Math.round(cy);
-        [[8,12],[12,8],[8,11],[11,8],[10,10],[8,10],[10,8],[8,8]].forEach(([ox,oy])=>{
-          cands.push({x:bX+ox*sx, y:bY+oy*sy});
-        });
-      } else {
-        // helipad/city — hs=12, 가능 정수 (11,15)/(15,11) 같은 큰 step
-        const bX=Math.round(cx), bY=Math.round(cy);
-        [[11,15],[15,11],[11,14],[14,11],[11,11],[10,15],[15,10]].forEach(([ox,oy])=>{
-          cands.push({x:bX+ox*sx, y:bY+oy*sy});
-        });
-      }
-      // valid + 방향 정렬 + 최대 거리 후보 선택
+      // 전진 — 모든 정수 후보 위치 브루트 포스 탐색
+      // (Math.round/분수 source 이슈 회피 — 정확한 정수 검증)
+      const reach=ct==='tower'?13:16; // tower:12+여유, zone:15+여유
+      const baseX=Math.round(cx), baseY=Math.round(cy);
       let best=null;
-      for(const cd of cands){
-        if(!isConnFromSrc(cd.x,cd.y)) continue;
-        const ox=cd.x-cx, oy=cd.y-cy;
-        const d2=Math.hypot(ox,oy);
-        if(d2<1) continue;
-        const cosTheta=(ox*ux+oy*uy)/d2;
-        if(cosTheta<0.85) continue; // 30°↑ 벗어나면 제외
-        if(!best||d2>best.d) best={x:cd.x,y:cd.y,d:d2};
+      for(let ox=-reach;ox<=reach;ox++){
+        for(let oy=-reach;oy<=reach;oy++){
+          if(ox===0&&oy===0) continue;
+          const qx=baseX+ox, qy=baseY+oy;
+          if(!isConnFromSrc(qx,qy)) continue;
+          const rdx=qx-cx, rdy=qy-cy;
+          const d2=Math.hypot(rdx,rdy);
+          if(d2<1) continue;
+          const cosTheta=(rdx*ux+rdy*uy)/d2;
+          if(cosTheta<0.92) continue; // 23°↑ 벗어나면 제외 — 직진성 우선
+          if(!best||d2>best.d) best={x:qx,y:qy,d:d2};
+        }
       }
       if(best){ px=best.x; py=best.y; }
       else {
-        // 모든 후보 실패 — 안전망 (드물게 발생)
+        // 안전망 — 절대 발생 안 해야 함
         px=Math.round(cx+ux*maxStep*0.7);
         py=Math.round(cy+uy*maxStep*0.7);
       }
