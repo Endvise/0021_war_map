@@ -415,6 +415,8 @@ tr:hover td{background:oklch(0.82 0.15 195/.025)}
         data-tip="타워 클릭으로 철거">🔧 철거</button>
       <button class="tool" id="tmIgnite" onclick="setTowerMode('ignite')"
         data-tip="타워 클릭으로 점화 — 내구도 초당 감소">🔥 점화</button>
+      <button class="tool" id="tmPredict" onclick="setTowerMode('predict')"
+        data-tip="예측 타워 — 클릭으로 점선 박스 추가, 우클릭으로 제거">🔮 예측</button>
     </div>
     <button class="btn btn-reset" onclick="undoTower()"
       data-tip="마지막 타워 건설 취소">↩ 취소</button>
@@ -944,12 +946,12 @@ const TOWER_DEFAULTS = { maxHp:7200, burnRatePerSec:5, burnDurationSec:900 };
 
 function setTowerMode(m) {
   towerMode = m;
-  ['tmPointer','tmBuild','tmDemol','tmIgnite','tmRoute'].forEach(id=>{
+  ['tmPointer','tmBuild','tmDemol','tmIgnite','tmRoute','tmPredict'].forEach(id=>{
     const btn=document.getElementById(id); if(!btn) return;
     btn.removeAttribute('data-active');
     btn.style.color='';
   });
-  const activeIds={pointer:'tmPointer',build:'tmBuild',demolish:'tmDemol',ignite:'tmIgnite',route:'tmRoute'};
+  const activeIds={pointer:'tmPointer',build:'tmBuild',demolish:'tmDemol',ignite:'tmIgnite',route:'tmRoute',predict:'tmPredict'};
   const activeBtn=document.getElementById(activeIds[m]);
   if(activeBtn) activeBtn.setAttribute('data-active','1');
   canvas.style.cursor = m==='pointer' ? 'default' : 'crosshair';
@@ -1252,6 +1254,7 @@ const G      = id => +document.getElementById(id).value;
 // ── 드래그 ────────────────────────────────────────────
 let drag={}, isDragging=false;
 let movingTower=null; // {alIdx, ti} — 우클릭 메뉴에서 '이동' 선택 시 다음 좌클릭에서 이동
+let manualPreviewTowers=[]; // 사용자 수동 배치 예측 타워 [{x,y,color,num}]
 
 // ── 동맹 관계 ─────────────────────────────────────────
 let relations = {};
@@ -1399,6 +1402,7 @@ function draw() {
   // 타워
   alliances.forEach(al => drawBlocks(al.towers, al.color, getConnectedTowers(al)));
   drawCollisionMarkers();
+  drawManualPreviewTowers();
   drawPreviewTowers();
   drawWaypoints();
   if (ghost) drawGhost();
@@ -1551,7 +1555,8 @@ function updateModePill(){
     build:  {ico:'🔨',txt:'건설'},
     demolish:{ico:'🔧',txt:'철거'},
     ignite: {ico:'🔥',txt:'점화'},
-    route:  {ico:'🗺',txt:'경로'}
+    route:  {ico:'🗺',txt:'경로'},
+    predict:{ico:'🔮',txt:'예측'}
   };
   const c=cfg[towerMode]||cfg.pointer;
   const ic=document.getElementById('modePillIco');
@@ -1676,6 +1681,31 @@ function drawGhost(){
 
 // ── 경유지 깃발 ──────────────────────────────────────────
 // ── 경유지 깃발 (첫=출발 / 마지막=도착 / 중간=경유) ─────────────
+// ── 사용자 수동 예측 타워 (점선 박스) ─────────────────
+function drawManualPreviewTowers(){
+  if(!manualPreviewTowers.length) return;
+  ctx.save();
+  manualPreviewTowers.forEach(pt=>{
+    const {cx,cy}=toC(pt.x,pt.y), s=TS*ppc;
+    // 점선 박스
+    ctx.setLineDash([4,3]);
+    ctx.fillStyle=pt.color+'1f';
+    ctx.fillRect(cx-s/2,cy-s/2,s,s);
+    ctx.strokeStyle=pt.color+'cc';
+    ctx.lineWidth=1.4;
+    ctx.strokeRect(cx-s/2,cy-s/2,s,s);
+    ctx.setLineDash([]);
+    // 번호 + 🔮 마커
+    if(ppc>=2){
+      ctx.fillStyle=pt.color+'ee';
+      ctx.font=`bold ${Math.max(7,ppc*1.4)}px "Space Mono",monospace`;
+      ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText('🔮'+pt.num,cx,cy);
+    }
+  });
+  ctx.restore();
+}
+
 // ── 미래 예측 타워 미리보기 (점선 박스) ─────────────────
 function drawPreviewTowers(){
   if(!previewTowers.length) return;
@@ -2031,6 +2061,13 @@ function getSnapped(e){const raw=getRaw(e);return snapPos(raw.x,raw.y);}
 
 canvas.addEventListener('mousedown',e=>{
   if(e.button!==0) return;
+  // 예측 모드 — 좌클릭으로 점선 박스 추가
+  if(towerMode==='predict'){
+    const g=getSnapped(e);
+    const al=alliances[activeIdx];
+    manualPreviewTowers.push({x:g.x, y:g.y, color:al?.color||'#888', num:manualPreviewTowers.length+1});
+    draw(); return;
+  }
   // 타워 이동 모드 — 다음 좌클릭으로 새 위치 설정
   if(movingTower!==null){
     const g=getSnapped(e);
@@ -2213,6 +2250,21 @@ canvas.addEventListener('mouseup',e=>{
 canvas.addEventListener('mouseleave',()=>{drag={};isDragging=false;ghost=null;drawingTerrain=null;previewHoverIdx=-1;hidePreviewTooltip();canvas.style.cursor='crosshair';draw();});
 canvas.addEventListener('contextmenu',e=>{
   e.preventDefault();
+  // 예측 모드 — 우클릭으로 가까운 예측 타워 제거
+  if(towerMode==='predict'){
+    const raw=getRaw(e);
+    let nearest=-1, bestD=TS;
+    manualPreviewTowers.forEach((t,i)=>{
+      const d=Math.max(Math.abs(t.x-raw.x),Math.abs(t.y-raw.y));
+      if(d<bestD){ bestD=d; nearest=i; }
+    });
+    if(nearest>=0){
+      manualPreviewTowers.splice(nearest,1);
+      // 번호 재정렬
+      manualPreviewTowers.forEach((t,i)=>t.num=i+1);
+    }
+    draw(); return;
+  }
   // 타워 이동 모드 중이면 우클릭으로 취소 — 원래 위치 복구
   if(movingTower!==null){
     const al=alliances[movingTower.alIdx];
