@@ -1779,8 +1779,8 @@ function showPreviewTooltip(pt,clientX,clientY){
   el.style.top=(clientY+8)+'px';
   el.style.display='block';
 }
-// 수동 예측 타워 호버 툴팁
-function showManualPreviewTooltip(pt,clientX,clientY){
+// 수동 예측 타워 호버 툴팁 — route 모드 미래 예측 툴팁과 동일 스타일
+function showManualPreviewTooltip(pt,idx,clientX,clientY){
   let el=document.getElementById('previewTooltip');
   if(!el){
     el=document.createElement('div');
@@ -1789,26 +1789,46 @@ function showManualPreviewTooltip(pt,clientX,clientY){
       +'background:rgba(10,20,35,0.95);border:1px solid #4fc3f7;'
       +'border-radius:6px;padding:8px 11px;font-size:.72rem;'
       +'color:#c8daf0;font-family:"Space Mono",monospace;'
-      +'box-shadow:0 4px 14px rgba(0,0,0,0.65);min-width:140px';
+      +'box-shadow:0 4px 14px rgba(0,0,0,0.65);min-width:160px';
     document.body.appendChild(el);
   }
-  // 인접 도시·헬기장 자동 감지
+  // 만약 이 타워를 실제로 짓는다면 번호 = 현재 연맹 타워 수 + 수동 예측 순번
+  const al=alliances[activeIdx];
+  const existing=al?.towers.length||0;
+  const futureNum=existing+idx+1;
+  // 단일 비용 + 누적 비용 (이 시점까지 수동 예측 타워들의 합)
+  const bm=G('tBuildMin')||23;
+  const effBm=al?getEffBuildMin(al,bm):bm;
+  let cumCost=0, totalMin=0;
+  for(let i=0;i<=idx;i++){
+    const c=getTowerCost(existing+i+1);
+    cumCost+=c;
+    totalMin+=effBm;
+  }
+  const thisCost=getTowerCost(futureNum);
+  const arrival=Date.now()+totalMin*60*1000;
+  const utc=new Date(arrival).toUTCString().match(/(\d{2}:\d{2}:\d{2})/)?.[1]||'?';
+  const hrs=Math.floor(totalMin/60), mns=Math.floor(totalMin%60);
+  // 인접 도시·헬기장
   let adjInfo='';
   for(const c of cities){
     if(isTowerConnToCity({x:pt.x,y:pt.y},c)){
-      adjInfo+=`<div style="color:#ffd54f;font-size:.66rem">🏙 ${c.label||'도시'} 인접</div>`;
+      adjInfo+=`<div style="color:#ffd54f;font-size:.66rem;margin-top:2px">🏙 ${c.label||'도시'} 인접 (소유 발동)</div>`;
     }
   }
-  for(const al of alliances){
-    if(isConnToHelipad({x:pt.x,y:pt.y},al.helipad)){
-      adjInfo+=`<div style="color:${al.color};font-size:.66rem">🚁 ${al.name} 헬기장 인접</div>`;
+  for(const al2 of alliances){
+    if(isConnToHelipad({x:pt.x,y:pt.y},al2.helipad)){
+      adjInfo+=`<div style="color:${al2.color};font-size:.66rem;margin-top:2px">🚁 ${al2.name} 헬기장 인접</div>`;
     }
   }
   el.innerHTML=`
-    <div style="color:${pt.color};font-weight:700;margin-bottom:4px;font-size:.78rem">🔮 예측 타워 #${pt.num}</div>
+    <div style="color:${pt.color};font-weight:700;margin-bottom:4px;font-size:.78rem">🔮 예측 타워 #${futureNum}<span style="color:#888;font-size:.66rem;margin-left:6px">(순번 ${idx+1}/${manualPreviewTowers.length})</span></div>
     <div style="color:#888;margin-bottom:3px">📍 (${pt.x}, ${pt.y})</div>
-    <div style="color:#aaa;font-size:.66rem;margin-bottom:2px">수동 배치 (실제 미생성)</div>
-    ${adjInfo||'<div style="color:#666;font-size:.66rem">인접 도시/헬기장 없음</div>'}
+    <div style="margin-bottom:2px">⏰ UTC <b style="color:#4fc3f7">${utc}</b> 도달 예상</div>
+    <div style="margin-bottom:2px;color:#aaa;font-size:.66rem">└ ${hrs}시간 ${mns}분 후</div>
+    <div style="margin-bottom:2px">💰 단일 비용 <b style="color:#ef9a9a">${(thisCost/1000).toFixed(1)}k</b></div>
+    <div>💰 누적 비용 <b style="color:#fbbf24">${(cumCost/1000).toFixed(1)}k</b></div>
+    ${adjInfo}
   `;
   el.style.left=(clientX+14)+'px';
   el.style.top=(clientY+8)+'px';
@@ -2227,7 +2247,7 @@ canvas.addEventListener('mousemove',e=>{
       const pt=manualPreviewTowers[i];
       if(Math.max(Math.abs(pt.x-raw.x),Math.abs(pt.y-raw.y))<=TS/2){ _mHov=i; break; }
     }
-    if(_mHov>=0) showManualPreviewTooltip(manualPreviewTowers[_mHov],e.clientX,e.clientY);
+    if(_mHov>=0) showManualPreviewTooltip(manualPreviewTowers[_mHov],_mHov,e.clientX,e.clientY);
     else hidePreviewTooltip();
   }
   draw();
