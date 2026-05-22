@@ -1204,17 +1204,17 @@ function calcTowerCountFor(sx,sy,tx,ty,fromHelipadR){
   return Math.ceil(dist/towerStep);
 }
 // 타워 ↔ 헬기장 연결
-// r=15 → center 소수점(X.5) + 정수 타워center = 반정수 dx → Math.round로 서브픽셀 오인 방지
+// 분수 중심(X.5) + 정수 타워좌표 = 반정수 거리. 0.5 leniency 추가로 정수 셀 단위 인접 인정.
 function isConnToHelipad(t,h){
   const hcx=h.x+h.r/2, hcy=h.y-h.r/2, hs=TS/2+h.r/2;
-  const dx=Math.round(Math.abs(t.x-hcx)), dy=Math.round(Math.abs(t.y-hcy));
-  return (dx<hs && Math.max(0,dy-hs)<=GAP) || (dy<hs && Math.max(0,dx-hs)<=GAP);
+  const dx=Math.abs(t.x-hcx), dy=Math.abs(t.y-hcy);
+  return (dx<hs && dy-hs<=GAP+0.5) || (dy<hs && dx-hs<=GAP+0.5);
 }
-// 타워 ↔ 도시 영토 연결 (no corner touch)
+// 타워 ↔ 도시 영토 연결 (분수 중심 boundary 0.5 leniency)
 function isTowerConnToCity(t,c){
   const ccx=c.x+c.r/2, ccy=c.y-c.r/2;
-  const adx=Math.round(Math.abs(t.x-ccx)), ady=Math.round(Math.abs(t.y-ccy)), hs=TS/2+c.r/2;
-  return (adx<hs && Math.max(0,ady-hs)<=GAP) || (ady<hs && Math.max(0,adx-hs)<=GAP);
+  const adx=Math.abs(t.x-ccx), ady=Math.abs(t.y-ccy), hs=TS/2+c.r/2;
+  return (adx<hs && ady-hs<=GAP+0.5) || (ady<hs && adx-hs<=GAP+0.5);
 }
 // 도시 ↔ 헬기장 영토 연결
 function isCityConnToHelipad(c,h){
@@ -1384,8 +1384,13 @@ function draw() {
       if(isCityConnToHelipad(c, al.helipad)) return true;
       return connTowers.some(t => isTowerConnToCity(t, c));
     });
-    // (자동 해제 제거 — 우클릭 수동 지정이 즉시 덮어써지는 문제로 인해)
-    // 소유권은 사용자 우클릭 메뉴로만 변경. '소유 없음' 옵션도 메뉴에 있음.
+    // 소유 연맹이 더 이상 이 도시에 연결되지 않으면 소유권 자동 해제
+    // (isTowerConnToCity 0.5 leniency 적용 후라 정상 동작)
+    if(c.owner != null) {
+      const ownerAl = alliances[c.owner];
+      const ownerStillConn = ownerAl && connAlliances.some(al => al.id === ownerAl.id);
+      if(!ownerStillConn) c.owner = null;
+    }
     const owner = c.owner!=null ? alliances[c.owner] : null;
     const displayColor = owner ? owner.color : c.color;
     drawRect(c.x,c.y,c.r,displayColor,cityEmoji(c.level),c.label,connAlliances,owner);
