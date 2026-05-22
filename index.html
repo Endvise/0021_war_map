@@ -3078,6 +3078,61 @@ function calcRouteAt(rawX, rawY){
   if(resBtn) showTab('res',resBtn);
 }
 
+// 기존 네트워크(타워+점령가능도시)에서 BFS — 목표에 가장 가까운 도달 가능 노드 반환
+function findFurthestNetworkNode(srcX,srcY,srcType,srcR,tx,ty,al){
+  const visT=new Set(), visC=new Set();
+  let best={x:srcX,y:srcY,type:srcType,r:srcR};
+  let bestDist=Math.hypot(tx-srcX,ty-srcY);
+  const queue=[{x:srcX,y:srcY,type:srcType,r:srcR}];
+  while(queue.length){
+    const node=queue.shift();
+    // 기존 타워로 확장
+    al.towers.forEach((t,i)=>{
+      if(visT.has(i)) return;
+      let conn=false;
+      if(node.type==='tower'){
+        const adx=Math.abs(t.x-node.x), ady=Math.abs(t.y-node.y);
+        conn=(adx<TS && Math.max(0,ady-TS)<=GAP) || (ady<TS && Math.max(0,adx-TS)<=GAP);
+      } else {
+        const hs=TS/2+node.r/2;
+        const adx=Math.round(Math.abs(t.x-node.x)), ady=Math.round(Math.abs(t.y-node.y));
+        conn=(adx<hs && Math.max(0,ady-hs)<=GAP) || (ady<hs && Math.max(0,adx-hs)<=GAP);
+      }
+      if(conn){
+        visT.add(i);
+        const tn={x:t.x,y:t.y,type:'tower',r:0};
+        queue.push(tn);
+        const d=Math.hypot(tx-t.x,ty-t.y);
+        if(d<bestDist){ bestDist=d; best=tn; }
+      }
+    });
+    // 점령가능 도시로 확장
+    cities.forEach((c,i)=>{
+      if(visC.has(i)) return;
+      if(!isCityBridgeableBy(c,al)) return;
+      const ccx=c.x+c.r/2, ccy=c.y-c.r/2;
+      let conn=false;
+      if(node.type==='tower'){
+        const hs=TS/2+c.r/2;
+        const adx=Math.round(Math.abs(node.x-ccx)), ady=Math.round(Math.abs(node.y-ccy));
+        conn=(adx<hs && Math.max(0,ady-hs)<=GAP) || (ady<hs && Math.max(0,adx-hs)<=GAP);
+      } else {
+        const hs=node.r/2+c.r/2;
+        const adx=Math.round(Math.abs(node.x-ccx)), ady=Math.round(Math.abs(node.y-ccy));
+        conn=(adx<hs && Math.max(0,ady-hs)<=GAP) || (ady<hs && Math.max(0,adx-hs)<=GAP);
+      }
+      if(conn){
+        visC.add(i);
+        const cn={x:ccx,y:ccy,type:'city',r:c.r};
+        queue.push(cn);
+        const d=Math.hypot(tx-ccx,ty-ccy);
+        if(d<bestDist){ bestDist=d; best=cn; }
+      }
+    });
+  }
+  return best;
+}
+
 function calcWaypointRoute(){
   // 최소 2개 (출발+도착) 필요
   if(waypoints.length<2){
@@ -3122,17 +3177,33 @@ function calcWaypointRoute(){
   const conn=new Set();
   checkCityConn(curX,curY,conn);
   let cem=al.cement*1000, total=0;
-  // towerNum 기준: helipad/도시 출발이면 0, 타워 출발이면 그 타워 번호
-  let towerNum=0;
-  if(segSrcType==='tower' && fromLabel.startsWith('🔨')){
-    const m=fromLabel.match(/#(\d+)/);
-    if(m) towerNum=+m[1];
+  // 기존 17개 등 이미 깔려 있는 타워가 있으면 새 타워는 (기존 개수 + 1)번부터 부여
+  let towerNum=al.towers.length;
+  if(segSrcType==='tower'){
+    const _idx=al.towers.findIndex(t=>Math.abs(t.x-curX)<1&&Math.abs(t.y-curY)<1);
+    if(_idx>=0) towerNum=_idx+1;
   }
   const segments=[];
 
   stopWps.forEach((wp,wpi)=>{
     const tx=wp.x, ty=wp.y;
     const dist=Math.sqrt((tx-curX)**2+(ty-curY)**2);
+    // 기존 네트워크(이미 깔린 타워/소유가능 도시)에서 이 세그먼트 목표(wp)에 가장 가까운 노드로 점프
+    // → 사용자 지정 경로는 유지하되, 그 위에 이미 있는 인프라는 재사용해서 새 타워 최소화
+    const _netEnd=findFurthestNetworkNode(curX,curY,segSrcType,segSrcR,tx,ty,al);
+    if(_netEnd.x!==curX || _netEnd.y!==curY){
+      curX=_netEnd.x; curY=_netEnd.y;
+      segSrcType=_netEnd.type; segSrcR=_netEnd.r;
+      if(_netEnd.type==='tower'){
+        const _ti=al.towers.findIndex(t=>t.x===_netEnd.x && t.y===_netEnd.y);
+        if(_ti>=0){ towerNum=_ti+1; if(wpi===0) fromLabel=`🔨 타워 #${_ti+1}`; }
+      } else if(_netEnd.type==='city'){
+        const _c=cities.find(c=>(c.x+c.r/2)===_netEnd.x && (c.y-c.r/2)===_netEnd.y);
+        if(_c && wpi===0) fromLabel=`🏙 ${_c.label||'도시'}`;
+        if(towerNum<al.towers.length) towerNum=al.towers.length;
+      }
+      checkCityConn(curX,curY,conn);
+    }
     const positions=planTowerPlacement(curX,curY,segSrcType,segSrcR,tx,ty,al);
     const steps=positions.map(pt=>{
       const newC=checkCityConn(pt.x,pt.y,conn);
