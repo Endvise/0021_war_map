@@ -881,6 +881,8 @@ let alIdSeq   = 8;
 let activeIdx = 0;
 let towerMode = 'pointer'; // 'pointer' | 'build' | 'demolish' | 'ignite' | 'route'
 let waypoints = []; // 경유지 깃발 [{x,y}]
+let previewTowers = []; // 미래 예측 타워 [{x,y,num,arrival,cumCost,color,bridged}]
+let previewHoverIdx = -1;
 let draggingWpIdx = null;
 const WP_HIT = 8; // 경유지 클릭 감지 반경 (맵 좌표 단위)
 function findNearestWaypoint(x,y){
@@ -1332,6 +1334,7 @@ function draw() {
   // 타워
   alliances.forEach(al => drawBlocks(al.towers, al.color, getConnectedTowers(al)));
   drawCollisionMarkers();
+  drawPreviewTowers();
   drawWaypoints();
   if (ghost) drawGhost();
   drawMinimap();
@@ -1608,6 +1611,71 @@ function drawGhost(){
 
 // ── 경유지 깃발 ──────────────────────────────────────────
 // ── 경유지 깃발 (첫=출발 / 마지막=도착 / 중간=경유) ─────────────
+// ── 미래 예측 타워 미리보기 (점선 박스) ─────────────────
+function drawPreviewTowers(){
+  if(!previewTowers.length) return;
+  ctx.save();
+  previewTowers.forEach((pt,i)=>{
+    const {cx,cy}=toC(pt.x,pt.y), s=TS*ppc;
+    const isHover=(i===previewHoverIdx);
+    // 점선 박스
+    ctx.setLineDash([3,2]);
+    ctx.fillStyle=pt.color+(isHover?'2a':'15');
+    ctx.fillRect(cx-s/2,cy-s/2,s,s);
+    ctx.strokeStyle=pt.color+(isHover?'ff':'aa');
+    ctx.lineWidth=isHover?2:1.2;
+    ctx.strokeRect(cx-s/2,cy-s/2,s,s);
+    ctx.setLineDash([]);
+    // 번호
+    if(ppc>=2){
+      ctx.fillStyle=pt.color+'dd';
+      ctx.font=`bold ${Math.max(7,ppc*1.5)}px "Space Mono",monospace`;
+      ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText('#'+pt.num,cx,cy);
+    }
+    // 도시 다리 표시
+    if(pt.bridged && ppc>=2){
+      ctx.fillStyle='#fbbf24';
+      ctx.font=`${Math.max(6,ppc*1.2)}px sans-serif`;
+      ctx.fillText('🏙',cx+s/2-ppc*1.5,cy-s/2+ppc*1.5);
+    }
+  });
+  ctx.restore();
+}
+
+function showPreviewTooltip(pt,clientX,clientY){
+  let el=document.getElementById('previewTooltip');
+  if(!el){
+    el=document.createElement('div');
+    el.id='previewTooltip';
+    el.style.cssText='position:fixed;pointer-events:none;z-index:10000;'
+      +'background:rgba(10,20,35,0.95);border:1px solid #4fc3f7;'
+      +'border-radius:6px;padding:8px 11px;font-size:.72rem;'
+      +'color:#c8daf0;font-family:"Space Mono",monospace;'
+      +'box-shadow:0 4px 14px rgba(0,0,0,0.65);min-width:160px';
+    document.body.appendChild(el);
+  }
+  const arrival=new Date(pt.arrival);
+  const utc=arrival.toUTCString().match(/(\d{2}:\d{2}:\d{2})/)?.[1]||'?';
+  const hours=Math.floor((pt.arrival-Date.now())/3600000);
+  const mins=Math.floor(((pt.arrival-Date.now())%3600000)/60000);
+  el.innerHTML=`
+    <div style="color:${pt.color};font-weight:700;margin-bottom:4px;font-size:.78rem">🏗 예상 타워 #${pt.num}</div>
+    <div style="color:#888;margin-bottom:3px">📍 (${pt.x}, ${pt.y})</div>
+    <div style="margin-bottom:2px">⏰ UTC <b style="color:#4fc3f7">${utc}</b> 도달</div>
+    <div style="margin-bottom:2px;color:#aaa;font-size:.66rem">└ ${hours}시간 ${mins}분 후</div>
+    <div>💰 누적 비용 <b style="color:#fbbf24">${(pt.cumCost/1000).toFixed(1)}k</b></div>
+    ${pt.bridged?'<div style="color:#fbbf24;font-size:.66rem;margin-top:3px">🏙 도시 다리 활용</div>':''}
+  `;
+  el.style.left=(clientX+14)+'px';
+  el.style.top=(clientY+8)+'px';
+  el.style.display='block';
+}
+function hidePreviewTooltip(){
+  const el=document.getElementById('previewTooltip');
+  if(el) el.style.display='none';
+}
+
 function drawWaypoints(){
   if(!waypoints.length) return;
   ctx.save();
@@ -1994,6 +2062,15 @@ canvas.addEventListener('mousemove',e=>{
   const _cg=`(${g.x}, ${g.y})`;
   document.getElementById('posBar').textContent='좌표: '+_cg;
   const _scg=document.getElementById('statCoord'); if(_scg) _scg.textContent=_cg;
+  // 미래 예측 타워 호버 감지
+  let _hovIdx=-1;
+  for(let i=0;i<previewTowers.length;i++){
+    const pt=previewTowers[i];
+    if(Math.max(Math.abs(pt.x-raw.x),Math.abs(pt.y-raw.y))<=TS/2){ _hovIdx=i; break; }
+  }
+  if(_hovIdx!==previewHoverIdx){ previewHoverIdx=_hovIdx; }
+  if(_hovIdx>=0) showPreviewTooltip(previewTowers[_hovIdx],e.clientX,e.clientY);
+  else hidePreviewTooltip();
   draw();
 });
 
@@ -2055,7 +2132,7 @@ canvas.addEventListener('mouseup',e=>{
   draw();
 });
 
-canvas.addEventListener('mouseleave',()=>{drag={};isDragging=false;ghost=null;drawingTerrain=null;canvas.style.cursor='crosshair';draw();});
+canvas.addEventListener('mouseleave',()=>{drag={};isDragging=false;ghost=null;drawingTerrain=null;previewHoverIdx=-1;hidePreviewTooltip();canvas.style.cursor='crosshair';draw();});
 canvas.addEventListener('contextmenu',e=>{
   e.preventDefault();
   // 타워 이동 모드 중이면 우클릭으로 취소 — 원래 위치 복구
@@ -2934,6 +3011,7 @@ function calcWaypointRoute(){
     document.getElementById('tabRes').innerHTML=
       `<div style="font-size:.7rem;color:#aaa;padding:14px;text-align:center;background:#080e18;border-radius:6px;line-height:1.5">${msg}</div>`;
     window._lastWpSteps=null;
+    previewTowers=[]; previewHoverIdx=-1; hidePreviewTooltip(); draw();
     return;
   }
   const al=alliances[activeIdx]; if(!al) return;
@@ -3015,6 +3093,22 @@ function calcWaypointRoute(){
   window._lastWpSteps = segments.flatMap(g => g.steps.map(st => ({x:st.x, y:st.y, cost:st.cost})));
   window._lastWpAlIdx = activeIdx;
   const totalCost = window._lastWpSteps.reduce((s,st)=>s+(st.cost||0),0);
+  // 미래 예측 타워 — 점선 박스 미리보기용
+  const _startTime=Date.now();
+  let _cumCost=0;
+  previewTowers=[];
+  segments.forEach(seg=>{
+    seg.steps.forEach(s=>{
+      _cumCost+=s.cost;
+      previewTowers.push({
+        x:s.x, y:s.y, num:s.num,
+        color:al.color,
+        arrival:_startTime+s.total*60*1000,
+        cumCost:_cumCost,
+        bridged:!!s.bridged
+      });
+    });
+  });
 
   const endWp=waypoints[waypoints.length-1];
   const stopCount=stopWps.length-1; // 도착 제외 중간 경유지 수
@@ -3090,6 +3184,7 @@ function applyWaypointRoute(){
   });
   waypoints=[];
   window._lastWpSteps=null;
+  previewTowers=[]; previewHoverIdx=-1; hidePreviewTooltip();
   setTowerMode('pointer');
   renderCfgTab();
   draw();
