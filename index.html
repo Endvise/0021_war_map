@@ -483,9 +483,20 @@ tr:hover td{background:oklch(0.82 0.15 195/.025)}
       onkeydown="if(event.key==='Enter')joinBattle()">
     <button class="btn" onclick="joinBattle()"
       style="padding:2px 8px;font-size:.65rem;background:rgba(96,165,250,.1);color:#60a5fa;border-color:rgba(96,165,250,.3)">→</button>
-    <button class="btn" onclick="showAIModal()"
-      data-tip="AI 어시스턴트 — 최적 배치·건설 추천·상대 분석·승률 예측"
-      style="margin-left:auto;padding:2px 8px;font-size:.68rem;background:rgba(96,165,250,.08);color:#60a5fa;border-color:rgba(96,165,250,.3)">🤖 AI</button>
+    <span style="margin-left:auto;display:inline-flex;gap:3px;align-items:center">
+      <button class="btn" onclick="aiAction('optimal')" data-tip="🎯 최적 배치 — 7/8도시 최단 경로"
+        style="padding:2px 7px;font-size:.78rem;background:rgba(74,222,128,.08);color:#4ade80;border-color:rgba(74,222,128,.3)">🎯</button>
+      <button class="btn" onclick="aiAction('priority')" data-tip="🏗 건설 우선순위 — 다음 타워 1·2·3순위"
+        style="padding:2px 7px;font-size:.78rem;background:rgba(251,191,36,.08);color:#fbbf24;border-color:rgba(251,191,36,.3)">🏗</button>
+      <button class="btn" onclick="aiAction('analysis')" data-tip="🕵 상대 분석 — 위협·기회·충돌"
+        style="padding:2px 7px;font-size:.78rem;background:rgba(239,68,68,.08);color:#f87171;border-color:rgba(239,68,68,.3)">🕵</button>
+      <button class="btn" onclick="aiAction('simulate')" data-tip="📊 승률 시뮬 — 최종 점수 예측"
+        style="padding:2px 7px;font-size:.78rem;background:rgba(167,139,250,.08);color:#a78bfa;border-color:rgba(167,139,250,.3)">📊</button>
+      <button class="btn" onclick="clearAIOverlay()" data-tip="AI 결과 지우기"
+        style="padding:2px 6px;font-size:.7rem;background:rgba(120,120,120,.08);color:#888;border-color:rgba(120,120,120,.2)">✕</button>
+      <button class="btn" onclick="showAIModal()" data-tip="AI 설정 — API 키·모델"
+        style="padding:2px 7px;font-size:.7rem;background:rgba(96,165,250,.08);color:#60a5fa;border-color:rgba(96,165,250,.3)">⚙</button>
+    </span>
     <button class="btn" onclick="showHelp()"
       style="padding:2px 8px;font-size:.68rem;background:rgba(255,255,255,.05);color:#5a7a9a;border-color:#1a2e50;border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-weight:bold">?</button>
   </div>
@@ -540,8 +551,8 @@ tr:hover td{background:oklch(0.82 0.15 195/.025)}
         <span style="font-size:.65rem;color:#888;font-weight:400">최종 점수 + 승리 확률</span>
       </button>
     </div>
-    <div id="aiResult" style="background:#080e18;border:1px solid #1a2e50;border-radius:6px;padding:14px;min-height:120px;max-height:50vh;overflow-y:auto;font-size:.76rem;line-height:1.65">
-      <div style="color:#5a7a9a;text-align:center;padding:20px 0">위 버튼 중 하나를 클릭하면 AI가 분석합니다.<br><span style="font-size:.66rem">※ Gemini 무료 티어: 15 req/min, 1500 req/day</span></div>
+    <div id="aiResult" style="background:#080e18;border:1px solid #1a2e50;border-radius:6px;padding:12px;min-height:80px;max-height:30vh;overflow-y:auto;font-size:.74rem;line-height:1.6">
+      <div style="color:#5a7a9a;text-align:center;padding:14px 0">위 버튼 클릭 시 결과가 맵 위에 시각화됩니다<br><span style="font-size:.62rem">※ Gemini 무료 티어: 15 req/min, 1500 req/day</span></div>
     </div>
   </div>
 </div>
@@ -1313,6 +1324,7 @@ const G      = id => +document.getElementById(id).value;
 let drag={}, isDragging=false;
 let movingTower=null; // {alIdx, ti} — 우클릭 메뉴에서 '이동' 선택 시 다음 좌클릭에서 이동
 let manualPreviewTowers=[]; // 사용자 수동 배치 예측 타워 [{x,y,color,num}]
+let aiOverlay=null; // {type, data, summary, time}
 
 // ── 동맹 관계 ─────────────────────────────────────────
 let relations = {};
@@ -1462,6 +1474,7 @@ function draw() {
   drawCollisionMarkers();
   drawManualPreviewTowers();
   drawPreviewTowers();
+  drawAIOverlay();
   drawWaypoints();
   if (ghost) drawGhost();
   drawMinimap();
@@ -1895,6 +1908,127 @@ function showManualPreviewTooltip(pt,idx,clientX,clientY){
 function hidePreviewTooltip(){
   const el=document.getElementById('previewTooltip');
   if(el) el.style.display='none';
+}
+
+// ── AI 분석 결과 맵 오버레이 ─────────────────────────────
+function drawAIOverlay(){
+  if(!aiOverlay) return;
+  const {type,data}=aiOverlay;
+  ctx.save();
+
+  if(type==='optimal' && data.tower_positions){
+    // 추천 타워 위치를 노란 점선 박스로
+    data.tower_positions.forEach(p=>{
+      const {cx,cy}=toC(p.x,p.y), s=TS*ppc;
+      ctx.setLineDash([5,3]);
+      ctx.strokeStyle='#fbbf24';
+      ctx.lineWidth=2;
+      ctx.strokeRect(cx-s/2,cy-s/2,s,s);
+      ctx.fillStyle='rgba(251,191,36,0.15)';
+      ctx.fillRect(cx-s/2,cy-s/2,s,s);
+      ctx.setLineDash([]);
+      if(ppc>=2){
+        ctx.fillStyle='#fbbf24';
+        ctx.font=`bold ${Math.max(8,ppc*1.8)}px "Space Mono",monospace`;
+        ctx.textAlign='center'; ctx.textBaseline='middle';
+        ctx.fillText('🎯'+p.order,cx,cy);
+      }
+    });
+    // 순서대로 연결선
+    if(data.tower_positions.length>1){
+      ctx.strokeStyle='rgba(251,191,36,0.5)';
+      ctx.lineWidth=1.5; ctx.setLineDash([3,3]);
+      ctx.beginPath();
+      data.tower_positions.sort((a,b)=>a.order-b.order).forEach((p,i)=>{
+        const {cx,cy}=toC(p.x,p.y);
+        if(i===0) ctx.moveTo(cx,cy); else ctx.lineTo(cx,cy);
+      });
+      ctx.stroke(); ctx.setLineDash([]);
+    }
+  }
+
+  if(type==='priority' && data.priorities){
+    const colors={1:'#ef4444',2:'#fbbf24',3:'#22c55e'};
+    data.priorities.forEach(p=>{
+      const {cx,cy}=toC(p.x,p.y), s=TS*ppc;
+      const c=colors[p.rank]||'#888';
+      ctx.setLineDash([6,3]);
+      ctx.strokeStyle=c; ctx.lineWidth=3;
+      ctx.strokeRect(cx-s/2,cy-s/2,s,s);
+      ctx.fillStyle=c+'22';
+      ctx.fillRect(cx-s/2,cy-s/2,s,s);
+      ctx.setLineDash([]);
+      // 큰 순위 숫자
+      if(ppc>=2){
+        ctx.fillStyle=c;
+        ctx.font=`bold ${Math.max(10,ppc*3)}px "Space Mono",monospace`;
+        ctx.textAlign='center'; ctx.textBaseline='middle';
+        ctx.fillText('#'+p.rank,cx,cy);
+      }
+    });
+  }
+
+  if(type==='analysis'){
+    // 위협 — 빨간 원
+    (data.threats||[]).forEach(t=>{
+      const {cx,cy}=toC(t.target_x,t.target_y);
+      const sev={high:18,medium:14,low:10}[t.severity]||14;
+      const r=sev*ppc;
+      ctx.strokeStyle='#ef4444'; ctx.lineWidth=2.5;
+      ctx.setLineDash([5,3]);
+      ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.stroke();
+      ctx.setLineDash([]);
+      if(ppc>=2){
+        ctx.fillStyle='#ef4444';
+        ctx.font=`bold ${Math.max(8,ppc*1.6)}px "Space Grotesk",sans-serif`;
+        ctx.textAlign='center'; ctx.textBaseline='middle';
+        ctx.fillText('⚠ '+t.alliance,cx,cy-r-ppc*2);
+      }
+    });
+    // 기회 — 녹색 별
+    (data.opportunities||[]).forEach(o=>{
+      const {cx,cy}=toC(o.x,o.y);
+      ctx.fillStyle='#22c55e';
+      ctx.font=`${Math.max(14,ppc*4)}px sans-serif`;
+      ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText('⭐',cx,cy);
+    });
+  }
+
+  if(type==='simulate' && data.rankings){
+    // 각 연맹 헬기장 위에 예측 점수 + 순위 표시
+    data.rankings.forEach(r=>{
+      const al=alliances.find(a=>a.name===r.alliance);
+      if(!al) return;
+      const {cx,cy}=toC(al.helipad.x+al.helipad.r/2, al.helipad.y-al.helipad.r/2);
+      const text=`#${r.rank} ${r.predicted_score}k`;
+      ctx.font=`bold ${Math.max(11,ppc*2.5)}px "Space Grotesk",sans-serif`;
+      const w=ctx.measureText(text).width+ppc*4;
+      const h=ppc*5;
+      ctx.fillStyle='rgba(10,20,35,0.92)';
+      ctx.fillRect(cx-w/2,cy-ppc*15,w,h);
+      ctx.strokeStyle=al.color; ctx.lineWidth=1.5;
+      ctx.strokeRect(cx-w/2,cy-ppc*15,w,h);
+      ctx.fillStyle=al.color;
+      ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText(text,cx,cy-ppc*15+h/2);
+    });
+    // 좌상단에 내 승률 표시
+    if(data.my_win_probability!=null){
+      const winText=`내 승률: ${data.my_win_probability}%`;
+      ctx.font=`bold ${ppc*4}px "Space Grotesk",sans-serif`;
+      ctx.fillStyle='rgba(10,20,35,0.92)';
+      const ww=ctx.measureText(winText).width+ppc*6;
+      ctx.fillRect(12,12,ww,ppc*8);
+      ctx.strokeStyle='#a78bfa'; ctx.lineWidth=1.5;
+      ctx.strokeRect(12,12,ww,ppc*8);
+      ctx.fillStyle='#a78bfa';
+      ctx.textAlign='left'; ctx.textBaseline='middle';
+      ctx.fillText(winText, 12+ppc*3, 12+ppc*4);
+    }
+  }
+
+  ctx.restore();
 }
 
 function drawWaypoints(){
@@ -2969,50 +3103,190 @@ const AI_PROMPTS={
 
 한국어, 200자 이내.`
 };
+const AI_SCHEMAS={
+  optimal:{
+    type:'object',
+    properties:{
+      target_city:{type:'string',description:'목표 도시 이름 (예: 7도시-1)'},
+      tower_positions:{
+        type:'array',
+        items:{
+          type:'object',
+          properties:{
+            x:{type:'number'},
+            y:{type:'number'},
+            order:{type:'number',description:'1부터 시작하는 순서'},
+            note:{type:'string',description:'짧은 설명 (예: 6도시-1 다리)'}
+          },
+          required:['x','y','order']
+        }
+      },
+      summary:{type:'string',description:'한 문장 요약 (50자 이내)'}
+    },
+    required:['target_city','tower_positions','summary']
+  },
+  priority:{
+    type:'object',
+    properties:{
+      priorities:{
+        type:'array',
+        items:{
+          type:'object',
+          properties:{
+            x:{type:'number'},
+            y:{type:'number'},
+            rank:{type:'number',description:'1,2,3 우선순위'},
+            target_city:{type:'string'},
+            reason:{type:'string'}
+          },
+          required:['x','y','rank','reason']
+        }
+      },
+      summary:{type:'string'}
+    },
+    required:['priorities','summary']
+  },
+  analysis:{
+    type:'object',
+    properties:{
+      threats:{
+        type:'array',
+        items:{
+          type:'object',
+          properties:{
+            alliance:{type:'string'},
+            target_x:{type:'number'},
+            target_y:{type:'number'},
+            severity:{type:'string',description:'high/medium/low'},
+            reason:{type:'string'}
+          },
+          required:['alliance','target_x','target_y','severity']
+        }
+      },
+      opportunities:{
+        type:'array',
+        items:{
+          type:'object',
+          properties:{
+            x:{type:'number'},
+            y:{type:'number'},
+            description:{type:'string'}
+          },
+          required:['x','y','description']
+        }
+      },
+      summary:{type:'string'}
+    },
+    required:['threats','summary']
+  },
+  simulate:{
+    type:'object',
+    properties:{
+      rankings:{
+        type:'array',
+        items:{
+          type:'object',
+          properties:{
+            alliance:{type:'string'},
+            predicted_score:{type:'number',description:'단위: k'},
+            rank:{type:'number'}
+          },
+          required:['alliance','predicted_score','rank']
+        }
+      },
+      my_win_probability:{type:'number',description:'0~100 정수'},
+      summary:{type:'string'}
+    },
+    required:['rankings','my_win_probability','summary']
+  }
+};
+
 async function aiAction(type){
   const apiKey=localStorage.getItem('gemini_api_key');
   if(!apiKey){
-    alert('Gemini API 키를 먼저 입력하고 저장해주세요.\nhttps://aistudio.google.com/apikey 에서 무료 발급');
+    showAIToast('🔑 Gemini API 키 미설정<br><span style="font-size:.66rem;color:#888">⚙ 버튼 클릭 → API 키 입력</span>','#f87171');
     return;
   }
+  const iconMap={optimal:'🎯',priority:'🏗',analysis:'🕵',simulate:'📊'};
+  const colorMap={optimal:'#4ade80',priority:'#fbbf24',analysis:'#f87171',simulate:'#a78bfa'};
+  showAIToast(`${iconMap[type]} 분석 중... <span style="color:#888;font-size:.66rem">5~10초</span>`,colorMap[type]);
   const resultEl=document.getElementById('aiResult');
-  resultEl.innerHTML='<div style="color:#60a5fa;text-align:center;padding:20px 0">🤖 분석 중... (5~10초)</div>';
-  // 게임 규칙(고정) + 타입별 사전계산 결과
+  if(resultEl) resultEl.innerHTML='<div style="color:#60a5fa;text-align:center;padding:14px 0">🤖 분석 중...</div>';
   const GAME_RULES=`[게임 규칙]
 - 타워: 9×9 블록, 도시/헬기장: 15×15 블록
-- 인접 조건: 한 축 겹침(<9) AND 다른 축 가장자리 접촉(≤9, GAP=0)
-- 타워가 도시/헬기장 가장자리 닿으면 해당 연맹 소유 발동
-- 도시는 다음 타워의 "다리"로 작동 (더 큰 step 가능, hs=12)
-- 도시 점수: 6도시=100k, 7도시=300k, 8도시=600k
-- 7도시는 프리즘코인도 누적 (코인×1000 = 추가 점수)
-- 다른 연맹과 동맹/적대 관계 → 적대만 충돌 예측 대상
-- 코인추격 시스템 (별도 메커니즘)`;
+- 인접 조건: 한 축 겹침(<9) AND 다른 축 ≤9 (GAP=0)
+- 타워가 도시 가장자리 닿으면 해당 연맹 소유 발동
+- 도시는 다음 타워의 "다리"로 작동 (hs=12)
+- 점수: 6도시=100k, 7도시=300k, 8도시=600k + 7도시 코인`;
   const context=buildAIContext(type);
-  const prompt=AI_PROMPTS[type]+'\n\n'+GAME_RULES+'\n\n'+context;
+  const prompt=AI_PROMPTS[type]+'\n\n'+GAME_RULES+'\n\n'+context+'\n\n반드시 JSON schema에 맞춰서만 응답하라.';
   try{
     const model=localStorage.getItem('gemini_model')||'gemini-2.5-flash-lite';
     const resp=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,{
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({contents:[{parts:[{text:prompt}]}]})
+      body:JSON.stringify({
+        contents:[{parts:[{text:prompt}]}],
+        generationConfig:{
+          response_mime_type:'application/json',
+          response_schema:AI_SCHEMAS[type]
+        }
+      })
     });
     const data=await resp.json();
     if(data.error){
-      resultEl.innerHTML=`<div style="color:#f87171">❌ API 오류: ${data.error.message||'알 수 없음'}</div>`;
+      showAIToast(`❌ API 오류<br><span style="font-size:.65rem">${(data.error.message||'').slice(0,160)}</span>`,'#f87171');
+      if(resultEl) resultEl.innerHTML=`<div style="color:#f87171;font-size:.72rem">❌ ${data.error.message||'API 오류'}</div>`;
       return;
     }
-    const text=data.candidates?.[0]?.content?.parts?.[0]?.text||'(빈 응답)';
-    // 마크다운 간단 변환
-    const html=text
-      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-      .replace(/\*\*(.+?)\*\*/g,'<b style="color:#fbbf24">$1</b>')
-      .replace(/\n\n/g,'</p><p style="margin:8px 0">')
-      .replace(/\n/g,'<br>');
-    const icon={optimal:'🎯',priority:'🏗',analysis:'🕵',simulate:'📊'}[type];
-    resultEl.innerHTML=`<div style="color:#4ade80;font-weight:700;margin-bottom:8px">${icon} 분석 결과</div><p style="margin:0">${html}</p>`;
+    const text=data.candidates?.[0]?.content?.parts?.[0]?.text||'{}';
+    let parsed;
+    try{ parsed=JSON.parse(text); }
+    catch(e){
+      showAIToast(`❌ JSON 파싱 실패<br><span style="font-size:.65rem">${text.slice(0,120)}</span>`,'#f87171');
+      if(resultEl) resultEl.innerHTML=`<div style="color:#f87171">파싱 실패: ${text.slice(0,200)}</div>`;
+      return;
+    }
+    aiOverlay={type,data:parsed,summary:parsed.summary||'',time:Date.now()};
+    draw();
+    const icon=iconMap[type];
+    showAIToast(`<div style="color:${colorMap[type]};font-weight:700;margin-bottom:4px">${icon} 분석 완료</div><div>${parsed.summary||'(요약 없음)'}</div><div style="margin-top:6px;font-size:.65rem;color:#888">맵에 시각화됨 — ✕ 버튼으로 지우기</div>`,colorMap[type]);
+    if(resultEl) resultEl.innerHTML=`
+      <div style="color:#4ade80;font-weight:700;margin-bottom:6px">${icon} 분석 완료 — 맵에 표시됨</div>
+      <div style="color:#c8daf0;font-size:.74rem;line-height:1.6">${parsed.summary||'(요약 없음)'}</div>
+    `;
   }catch(e){
-    resultEl.innerHTML=`<div style="color:#f87171">❌ 네트워크 오류: ${e.message}</div>`;
+    showAIToast(`❌ ${e.message}`,'#f87171');
+    if(resultEl) resultEl.innerHTML=`<div style="color:#f87171">❌ ${e.message}</div>`;
   }
+}
+function clearAIOverlay(){
+  aiOverlay=null;
+  draw();
+  hideAIToast();
+  const el=document.getElementById('aiResult');
+  if(el) el.innerHTML='<div style="color:#5a7a9a;text-align:center;padding:18px 0">위 버튼 중 하나 클릭</div>';
+}
+// 맵 위 AI 토스트 — 분석 중·완료 시 사용자가 모달 안열어도 확인 가능
+function showAIToast(html,color){
+  let el=document.getElementById('aiToast');
+  if(!el){
+    el=document.createElement('div');
+    el.id='aiToast';
+    el.style.cssText='position:fixed;top:14px;right:14px;z-index:9500;'
+      +'background:rgba(10,20,35,0.95);border-left:3px solid #60a5fa;'
+      +'border-radius:6px;padding:10px 14px;color:#c8daf0;font-size:.74rem;'
+      +'box-shadow:0 6px 20px rgba(0,0,0,0.55);max-width:340px;'
+      +'font-family:"Space Grotesk",sans-serif;line-height:1.55';
+    document.body.appendChild(el);
+  }
+  if(color) el.style.borderLeftColor=color;
+  el.innerHTML=html;
+  el.style.display='block';
+}
+function hideAIToast(){
+  const el=document.getElementById('aiToast');
+  if(el) el.style.display='none';
 }
 
 function showHelp(){
