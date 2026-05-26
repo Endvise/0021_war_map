@@ -495,7 +495,7 @@ tr:hover td{background:oklch(0.82 0.15 195/.025)}
 <div id="aiModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9000;overflow:auto">
   <div style="max-width:720px;margin:30px auto;background:#0d1117;border:1px solid #1a2e50;border-radius:8px;padding:20px;color:#c9d1d9;font-size:.78rem;line-height:1.5">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;border-bottom:1px solid #1e3a5f;padding-bottom:10px">
-      <h2 style="margin:0;color:#60a5fa;font-size:1.05rem">🤖 AI 어시스턴트 <span style="font-size:.65rem;color:#888;font-weight:400">Gemini 2.0 Flash</span></h2>
+      <h2 style="margin:0;color:#60a5fa;font-size:1.05rem">🤖 AI 어시스턴트 <span style="font-size:.65rem;color:#888;font-weight:400">Gemini API</span></h2>
       <button onclick="document.getElementById('aiModal').style.display='none'"
         style="background:none;border:none;color:#5a7a9a;font-size:1.2rem;cursor:pointer">✕</button>
     </div>
@@ -504,6 +504,15 @@ tr:hover td{background:oklch(0.82 0.15 195/.025)}
       <div style="display:flex;gap:6px;align-items:center">
         <input id="aiApiKey" type="password" placeholder="AIza..."
           style="flex:1;background:#0d1825;border:1px solid #1e3a5f;border-radius:4px;color:#eee;font-size:.74rem;padding:5px 8px;font-family:'Space Mono',monospace">
+        <select id="aiModelSel" onchange="localStorage.setItem('gemini_model',this.value)"
+          style="background:#0d1825;border:1px solid #1e3a5f;border-radius:4px;color:#eee;font-size:.7rem;padding:5px;font-family:inherit">
+          <option value="gemini-2.5-flash-lite">2.5 Flash Lite</option>
+          <option value="gemini-2.5-flash">2.5 Flash</option>
+          <option value="gemini-2.0-flash-lite">2.0 Flash Lite</option>
+          <option value="gemini-2.0-flash">2.0 Flash</option>
+          <option value="gemini-1.5-flash-8b">1.5 Flash 8B</option>
+          <option value="gemini-1.5-flash">1.5 Flash</option>
+        </select>
         <button onclick="saveAIKey()"
           style="background:rgba(96,165,250,.15);color:#60a5fa;border:1px solid rgba(96,165,250,.3);border-radius:4px;padding:5px 10px;font-size:.72rem;cursor:pointer">저장</button>
       </div>
@@ -2795,6 +2804,11 @@ function showAIModal(){
     document.getElementById('aiKeyStatus').textContent='✓ 저장된 키 사용 중';
     document.getElementById('aiKeyStatus').style.color='#4ade80';
   }
+  const savedModel=localStorage.getItem('gemini_model');
+  if(savedModel){
+    const sel=document.getElementById('aiModelSel');
+    if(sel) sel.value=savedModel;
+  }
 }
 function saveAIKey(){
   const v=document.getElementById('aiApiKey').value.trim();
@@ -2976,7 +2990,8 @@ async function aiAction(type){
   const context=buildAIContext(type);
   const prompt=AI_PROMPTS[type]+'\n\n'+GAME_RULES+'\n\n'+context;
   try{
-    const resp=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,{
+    const model=localStorage.getItem('gemini_model')||'gemini-2.5-flash-lite';
+    const resp=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,{
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({contents:[{parts:[{text:prompt}]}]})
