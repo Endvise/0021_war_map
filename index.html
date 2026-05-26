@@ -483,10 +483,59 @@ tr:hover td{background:oklch(0.82 0.15 195/.025)}
       onkeydown="if(event.key==='Enter')joinBattle()">
     <button class="btn" onclick="joinBattle()"
       style="padding:2px 8px;font-size:.65rem;background:rgba(96,165,250,.1);color:#60a5fa;border-color:rgba(96,165,250,.3)">→</button>
+    <button class="btn" onclick="showAIModal()"
+      data-tip="AI 어시스턴트 — 최적 배치·건설 추천·상대 분석·승률 예측"
+      style="margin-left:auto;padding:2px 8px;font-size:.68rem;background:rgba(96,165,250,.08);color:#60a5fa;border-color:rgba(96,165,250,.3)">🤖 AI</button>
     <button class="btn" onclick="showHelp()"
-      style="margin-left:auto;padding:2px 8px;font-size:.68rem;background:rgba(255,255,255,.05);color:#5a7a9a;border-color:#1a2e50;border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-weight:bold">?</button>
+      style="padding:2px 8px;font-size:.68rem;background:rgba(255,255,255,.05);color:#5a7a9a;border-color:#1a2e50;border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-weight:bold">?</button>
   </div>
 </header>
+
+<!-- AI 어시스턴트 모달 -->
+<div id="aiModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9000;overflow:auto">
+  <div style="max-width:720px;margin:30px auto;background:#0d1117;border:1px solid #1a2e50;border-radius:8px;padding:20px;color:#c9d1d9;font-size:.78rem;line-height:1.5">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;border-bottom:1px solid #1e3a5f;padding-bottom:10px">
+      <h2 style="margin:0;color:#60a5fa;font-size:1.05rem">🤖 AI 어시스턴트 <span style="font-size:.65rem;color:#888;font-weight:400">Gemini 1.5 Flash</span></h2>
+      <button onclick="document.getElementById('aiModal').style.display='none'"
+        style="background:none;border:none;color:#5a7a9a;font-size:1.2rem;cursor:pointer">✕</button>
+    </div>
+    <div style="background:#080e18;border-radius:6px;padding:10px 12px;margin-bottom:12px">
+      <div style="font-size:.66rem;color:#888;margin-bottom:5px">Gemini API 키 <a href="https://aistudio.google.com/apikey" target="_blank" style="color:#60a5fa;text-decoration:none">[발급받기]</a></div>
+      <div style="display:flex;gap:6px;align-items:center">
+        <input id="aiApiKey" type="password" placeholder="AIza..."
+          style="flex:1;background:#0d1825;border:1px solid #1e3a5f;border-radius:4px;color:#eee;font-size:.74rem;padding:5px 8px;font-family:'Space Mono',monospace">
+        <button onclick="saveAIKey()"
+          style="background:rgba(96,165,250,.15);color:#60a5fa;border:1px solid rgba(96,165,250,.3);border-radius:4px;padding:5px 10px;font-size:.72rem;cursor:pointer">저장</button>
+      </div>
+      <div id="aiKeyStatus" style="font-size:.6rem;color:#5a7a9a;margin-top:4px"></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
+      <button onclick="aiAction('optimal')"
+        style="background:rgba(74,222,128,.08);color:#4ade80;border:1px solid rgba(74,222,128,.3);border-radius:6px;padding:10px;font-size:.78rem;cursor:pointer;text-align:left">
+        🎯 <b>최적 배치 추천</b><br>
+        <span style="font-size:.65rem;color:#888;font-weight:400">7/8도시까지 최단 경로 + 타워 위치</span>
+      </button>
+      <button onclick="aiAction('priority')"
+        style="background:rgba(251,191,36,.08);color:#fbbf24;border:1px solid rgba(251,191,36,.3);border-radius:6px;padding:10px;font-size:.78rem;cursor:pointer;text-align:left">
+        🏗 <b>건설 우선순위</b><br>
+        <span style="font-size:.65rem;color:#888;font-weight:400">다음 타워는 어디·왜</span>
+      </button>
+      <button onclick="aiAction('analysis')"
+        style="background:rgba(239,68,68,.08);color:#f87171;border:1px solid rgba(239,68,68,.3);border-radius:6px;padding:10px;font-size:.78rem;cursor:pointer;text-align:left">
+        🕵 <b>상대 분석</b><br>
+        <span style="font-size:.65rem;color:#888;font-weight:400">다른 연맹 패턴·위협·기회</span>
+      </button>
+      <button onclick="aiAction('simulate')"
+        style="background:rgba(167,139,250,.08);color:#a78bfa;border:1px solid rgba(167,139,250,.3);border-radius:6px;padding:10px;font-size:.78rem;cursor:pointer;text-align:left">
+        📊 <b>승률 시뮬레이션</b><br>
+        <span style="font-size:.65rem;color:#888;font-weight:400">최종 점수 + 승리 확률</span>
+      </button>
+    </div>
+    <div id="aiResult" style="background:#080e18;border:1px solid #1a2e50;border-radius:6px;padding:14px;min-height:120px;max-height:50vh;overflow-y:auto;font-size:.76rem;line-height:1.65">
+      <div style="color:#5a7a9a;text-align:center;padding:20px 0">위 버튼 중 하나를 클릭하면 AI가 분석합니다.<br><span style="font-size:.66rem">※ Gemini 무료 티어: 15 req/min, 1500 req/day</span></div>
+    </div>
+  </div>
+</div>
 
 <!-- 도움말 모달 -->
 <div id="helpModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9000;overflow:auto">
@@ -2736,6 +2785,171 @@ function renderTableStr(towers){
 }
 
 function resetTowers(){ alliances.forEach(al=>al.towers=[]); draw(); }
+
+// ── AI 어시스턴트 ─────────────────────────────────────
+function showAIModal(){
+  document.getElementById('aiModal').style.display='block';
+  const saved=localStorage.getItem('gemini_api_key');
+  if(saved){
+    document.getElementById('aiApiKey').value=saved;
+    document.getElementById('aiKeyStatus').textContent='✓ 저장된 키 사용 중';
+    document.getElementById('aiKeyStatus').style.color='#4ade80';
+  }
+}
+function saveAIKey(){
+  const v=document.getElementById('aiApiKey').value.trim();
+  if(!v){ alert('API 키를 입력해주세요.'); return; }
+  localStorage.setItem('gemini_api_key',v);
+  document.getElementById('aiKeyStatus').textContent='✓ 저장 완료';
+  document.getElementById('aiKeyStatus').style.color='#4ade80';
+}
+// 현재 게임 상태를 LLM이 읽을 수 있는 텍스트로 변환
+function buildAIContext(){
+  const al=alliances[activeIdx];
+  const lines=[];
+  lines.push(`# 현재 게임 상태`);
+  lines.push(`맵 크기: ${MAP_W} × ${MAP_H}`);
+  lines.push(`내 연맹: ${al?.name||'?'} (인덱스 ${activeIdx})`);
+  lines.push('');
+  lines.push(`## 연맹 ${alliances.length}개`);
+  alliances.forEach((a,i)=>{
+    const h=a.helipad;
+    const score=calcScore(i);
+    lines.push(`- [${i}] ${a.name} (색:${a.color}) 헬기장:(${h.x},${h.y}) 타워:${a.towers.length}개 시멘트:${a.cement}k 분당:${a.prod||0}k 점수:${score.total} (도시${score.cityScore}+코인${score.prism})`);
+    if(a.towers.length>0 && i===activeIdx){
+      lines.push(`  내 타워 좌표: ${a.towers.slice(0,15).map(t=>`(${t.x},${t.y})`).join(' ')}${a.towers.length>15?` ...총${a.towers.length}개`:''}`);
+    }
+  });
+  lines.push('');
+  lines.push(`## 도시 ${cities.length}개`);
+  cities.forEach(c=>{
+    const own=c.owner!=null?alliances[c.owner].name:'미점령';
+    lines.push(`- ${c.label} L${c.level} 좌표(${c.x+c.r/2},${c.y-c.r/2}) 소유:${own}`);
+  });
+  lines.push('');
+  lines.push(`## 동맹 관계`);
+  const allies=[], enemies=[];
+  alliances.forEach((a,i)=>{
+    alliances.forEach((b,j)=>{
+      if(i>=j) return;
+      const r=getRel(i,j);
+      if(r==='ally') allies.push(`${a.name}↔${b.name}`);
+      else if(r==='enemy') enemies.push(`${a.name}↔${b.name}`);
+    });
+  });
+  lines.push(`동맹: ${allies.join(', ')||'없음'}`);
+  lines.push(`적대: ${enemies.join(', ')||'없음'}`);
+  return lines.join('\n');
+}
+const AI_PROMPTS={
+  optimal: `당신은 SLG 전장 시뮬레이터의 전략 분석 AI입니다.
+아래 게임 상태에서 "내 연맹"이 7도시 또는 8도시를 점령하기 위한 최적 경로와 타워 배치를 추천해주세요.
+
+게임 규칙:
+- 타워는 9×9 블록, 도시는 15×15 블록
+- 인접 조건: 한 축 겹침(<9) AND 다른 축 가장자리 접촉(≤9)
+- 타워가 도시 가장자리에 닿으면 도시가 해당 연맹 소유로 전환됨
+- 도시는 다음 타워의 "다리"로 작용 (더 큰 step 가능)
+
+분석 결과를 다음 형식으로:
+- **목표 도시**: (어디로 갈지)
+- **경로 요약**: (전체 흐름)
+- **핵심 타워 좌표**: 5~10개 (구체적 x,y)
+- **이유**: (왜 이 경로가 최적인지)
+- **주의사항**: (적대 연맹 차단 등)
+
+답변은 한국어로, 200자 이내 간결하게.`,
+
+  priority: `당신은 SLG 전장 전략 코치 AI입니다.
+아래 게임 상태에서 "내 연맹"이 다음에 어디에 타워를 지어야 점수/효율이 가장 좋을지 추천해주세요.
+
+분석 항목:
+- 가장 가까운 미점령 6/7/8 도시
+- 현재 시멘트로 몇 개 타워 건설 가능한지
+- 적대 연맹의 차단 가능성
+- 1순위, 2순위, 3순위 추천 위치 (좌표 포함)
+
+답변 형식:
+**1순위**: 좌표 (x,y) → 도시 N — 이유
+**2순위**: 좌표 (x,y) → 도시 N — 이유
+**3순위**: 좌표 (x,y) → 도시 N — 이유
+
+한국어, 150자 이내.`,
+
+  analysis: `당신은 SLG 전장 정보 분석 AI입니다.
+아래 게임 상태에서 "내 연맹"의 관점에서 다른 연맹들을 분석해주세요.
+
+분석 항목:
+- 각 연맹의 현재 진행 방향(어느 도시로 향하는지)
+- 위협 연맹 (점수/위치 기준)
+- 가장 큰 적
+- 동맹 결성 가능 후보
+- 충돌 예상 지점
+
+답변 형식:
+**위협 분석**: ...
+**기회**: ...
+**전략 제언**: ...
+
+한국어, 200자 이내.`,
+
+  simulate: `당신은 SLG 전장 결과 예측 AI입니다.
+아래 게임 상태가 그대로 유지된다고 가정하고 최종 결과를 시뮬레이션하세요.
+
+도시 점수: 6도시=10만, 7도시=30만, 8도시=60만
+프리즘코인은 추가 점수
+
+분석 항목:
+- 각 연맹 예상 최종 점수
+- 1위, 2위, 3위 순위
+- 내 연맹 승리 확률 (%)
+- 변수 (역전 가능성)
+
+답변 형식:
+**순위 예측**:
+1위 [연맹] — 점수
+2위 [연맹] — 점수
+...
+
+**내 연맹 승리 확률**: NN%
+**이유**: ...
+
+한국어, 200자 이내.`
+};
+async function aiAction(type){
+  const apiKey=localStorage.getItem('gemini_api_key');
+  if(!apiKey){
+    alert('Gemini API 키를 먼저 입력하고 저장해주세요.\nhttps://aistudio.google.com/apikey 에서 무료 발급');
+    return;
+  }
+  const resultEl=document.getElementById('aiResult');
+  resultEl.innerHTML='<div style="color:#60a5fa;text-align:center;padding:20px 0">🤖 분석 중... (5~10초)</div>';
+  const context=buildAIContext();
+  const prompt=AI_PROMPTS[type]+'\n\n'+context;
+  try{
+    const resp=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({contents:[{parts:[{text:prompt}]}]})
+    });
+    const data=await resp.json();
+    if(data.error){
+      resultEl.innerHTML=`<div style="color:#f87171">❌ API 오류: ${data.error.message||'알 수 없음'}</div>`;
+      return;
+    }
+    const text=data.candidates?.[0]?.content?.parts?.[0]?.text||'(빈 응답)';
+    // 마크다운 간단 변환
+    const html=text
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+      .replace(/\*\*(.+?)\*\*/g,'<b style="color:#fbbf24">$1</b>')
+      .replace(/\n\n/g,'</p><p style="margin:8px 0">')
+      .replace(/\n/g,'<br>');
+    const icon={optimal:'🎯',priority:'🏗',analysis:'🕵',simulate:'📊'}[type];
+    resultEl.innerHTML=`<div style="color:#4ade80;font-weight:700;margin-bottom:8px">${icon} 분석 결과</div><p style="margin:0">${html}</p>`;
+  }catch(e){
+    resultEl.innerHTML=`<div style="color:#f87171">❌ 네트워크 오류: ${e.message}</div>`;
+  }
+}
 
 function showHelp(){
   document.getElementById('helpModal').style.display='block';
