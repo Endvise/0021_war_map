@@ -495,7 +495,7 @@ tr:hover td{background:oklch(0.82 0.15 195/.025)}
 <div id="aiModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9000;overflow:auto">
   <div style="max-width:720px;margin:30px auto;background:#0d1117;border:1px solid #1a2e50;border-radius:8px;padding:20px;color:#c9d1d9;font-size:.78rem;line-height:1.5">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;border-bottom:1px solid #1e3a5f;padding-bottom:10px">
-      <h2 style="margin:0;color:#60a5fa;font-size:1.05rem">🤖 AI 어시스턴트 <span style="font-size:.65rem;color:#888;font-weight:400">Gemini 1.5 Flash</span></h2>
+      <h2 style="margin:0;color:#60a5fa;font-size:1.05rem">🤖 AI 어시스턴트 <span style="font-size:.65rem;color:#888;font-weight:400">Gemini 2.0 Flash</span></h2>
       <button onclick="document.getElementById('aiModal').style.display='none'"
         style="background:none;border:none;color:#5a7a9a;font-size:1.2rem;cursor:pointer">✕</button>
     </div>
@@ -2976,7 +2976,7 @@ async function aiAction(type){
   const context=buildAIContext(type);
   const prompt=AI_PROMPTS[type]+'\n\n'+GAME_RULES+'\n\n'+context;
   try{
-    const resp=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`,{
+    const resp=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,{
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({contents:[{parts:[{text:prompt}]}]})
