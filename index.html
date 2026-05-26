@@ -2803,44 +2803,83 @@ function saveAIKey(){
   document.getElementById('aiKeyStatus').textContent='✓ 저장 완료';
   document.getElementById('aiKeyStatus').style.color='#4ade80';
 }
-// 현재 게임 상태를 LLM이 읽을 수 있는 텍스트로 변환
-function buildAIContext(){
+// JS 사전 계산 70% + AI 30% 하이브리드.
+// 각 액션 타입별로 핵심 후보·통계만 추려 짧게 전달 → 토큰 절약
+function precomputeForAI(type){
   const al=alliances[activeIdx];
-  const lines=[];
-  lines.push(`# 현재 게임 상태`);
-  lines.push(`맵 크기: ${MAP_W} × ${MAP_H}`);
-  lines.push(`내 연맹: ${al?.name||'?'} (인덱스 ${activeIdx})`);
-  lines.push('');
-  lines.push(`## 연맹 ${alliances.length}개`);
-  alliances.forEach((a,i)=>{
-    const h=a.helipad;
-    const score=calcScore(i);
-    lines.push(`- [${i}] ${a.name} (색:${a.color}) 헬기장:(${h.x},${h.y}) 타워:${a.towers.length}개 시멘트:${a.cement}k 분당:${a.prod||0}k 점수:${score.total} (도시${score.cityScore}+코인${score.prism})`);
-    if(a.towers.length>0 && i===activeIdx){
-      lines.push(`  내 타워 좌표: ${a.towers.slice(0,15).map(t=>`(${t.x},${t.y})`).join(' ')}${a.towers.length>15?` ...총${a.towers.length}개`:''}`);
-    }
-  });
-  lines.push('');
-  lines.push(`## 도시 ${cities.length}개`);
-  cities.forEach(c=>{
-    const own=c.owner!=null?alliances[c.owner].name:'미점령';
-    lines.push(`- ${c.label} L${c.level} 좌표(${c.x+c.r/2},${c.y-c.r/2}) 소유:${own}`);
-  });
-  lines.push('');
-  lines.push(`## 동맹 관계`);
-  const allies=[], enemies=[];
-  alliances.forEach((a,i)=>{
-    alliances.forEach((b,j)=>{
-      if(i>=j) return;
-      const r=getRel(i,j);
-      if(r==='ally') allies.push(`${a.name}↔${b.name}`);
-      else if(r==='enemy') enemies.push(`${a.name}↔${b.name}`);
+  if(!al) return '내 연맹 없음';
+  const myScore=calcScore(activeIdx);
+  const myHel=al.helipad;
+  const myHelCx=myHel.x+myHel.r/2, myHelCy=myHel.y-myHel.r/2;
+  const myLastPos=al.towers.length>0
+    ?{x:al.towers[al.towers.length-1].x,y:al.towers[al.towers.length-1].y}
+    :{x:myHelCx,y:myHelCy};
+  const out=[];
+
+  if(type==='optimal' || type==='priority'){
+    const cands=cities.map((c)=>{
+      const ccx=c.x+c.r/2, ccy=c.y-c.r/2;
+      if(c.owner===activeIdx) return null;
+      const dist=Math.hypot(ccx-myLastPos.x,ccy-myLastPos.y);
+      const fromHelipad=al.towers.length===0;
+      const n=calcTowerCountFor(myLastPos.x,myLastPos.y,ccx,ccy,fromHelipad?al.helipad.r:null);
+      let cost=0;
+      const start=al.towers.length;
+      for(let i=0;i<n;i++) cost+=getTowerCost(start+i+1);
+      const score={6:100,7:300,8:600}[c.level]||0;
+      const eff=score/(cost/1000+1);
+      return {label:c.label,lvl:c.level,owner:c.owner!=null?alliances[c.owner].name:'미점령',dist:Math.round(dist),n,cost,score,eff:+eff.toFixed(2)};
+    }).filter(x=>x).sort((a,b)=>b.eff-a.eff);
+    out.push('미점령 도시 후보 (효율순 상위 6):');
+    cands.slice(0,6).forEach((c,i)=>{
+      out.push(`${i+1}. ${c.label} L${c.lvl}(${c.owner}) 거리${c.dist}칸 타워${c.n}개 비용${(c.cost/1000).toFixed(0)}k 점수${c.score}k 효율${c.eff}`);
     });
-  });
-  lines.push(`동맹: ${allies.join(', ')||'없음'}`);
-  lines.push(`적대: ${enemies.join(', ')||'없음'}`);
-  return lines.join('\n');
+    const buildable=Math.floor(al.cement*1000/Math.max(1,getTowerCost(al.towers.length+1)));
+    out.push(`내 현황: 시멘트${al.cement}k, 타워${al.towers.length}개, 점수${(myScore.total/1000).toFixed(0)}k, 즉시건설가능~${buildable}개`);
+  }
+
+  if(type==='analysis'){
+    out.push('연맹 현황·방향·근접도시:');
+    alliances.forEach((a,i)=>{
+      if(i===activeIdx) return;
+      const s=calcScore(i);
+      const lastT=a.towers.length>0?a.towers[a.towers.length-1]:null;
+      const refX=lastT?lastT.x:a.helipad.x+a.helipad.r/2;
+      const refY=lastT?lastT.y:a.helipad.y-a.helipad.r/2;
+      const dirX=lastT?lastT.x-(a.helipad.x+a.helipad.r/2):0;
+      const dirY=lastT?lastT.y-(a.helipad.y-a.helipad.r/2):0;
+      let near=null, nearD=Infinity;
+      cities.forEach(c=>{
+        if(c.owner===i) return;
+        const ccx=c.x+c.r/2, ccy=c.y-c.r/2;
+        const d=Math.hypot(ccx-refX,ccy-refY);
+        if(d<nearD){nearD=d;near=c;}
+      });
+      const rel=getRel(activeIdx,i);
+      out.push(`- ${a.name}(${rel==='ally'?'동맹':rel==='enemy'?'적대':'중립'}) 타워${a.towers.length}점수${(s.total/1000).toFixed(0)}k 방향(${dirX>0?'+x':'-x'},${dirY>0?'+y':'-y'}) 표적후보:${near?.label||'?'}(${Math.round(nearD)}칸)`);
+    });
+    if(lastCollisions&&lastCollisions.length){
+      out.push('충돌예상:');
+      lastCollisions.slice(0,3).forEach(c=>out.push(`- ${c.alA.name}vs${c.alB.name} ~${Math.round(c.time)}분후`));
+    }
+  }
+
+  if(type==='simulate'){
+    out.push('연맹별 점수:');
+    alliances.forEach((a,i)=>{
+      const s=calcScore(i);
+      const owned=cities.filter(c=>c.owner===i).map(c=>`L${c.level}`).join(',');
+      out.push(`- ${a.name}: ${(s.total/1000).toFixed(0)}k [${owned||'없음'}] T${a.towers.length} C${a.cement}k`);
+    });
+    const left={6:0,7:0,8:0};
+    cities.forEach(c=>{if(c.owner==null) left[c.level]++;});
+    out.push(`남은 미점령: 6=${left[6]}, 7=${left[7]}, 8=${left[8]} (점수 100k/300k/600k)`);
+  }
+
+  out.push(`내 연맹: ${al.name}`);
+  return out.join('\n');
 }
+function buildAIContext(type){ return precomputeForAI(type||'optimal'); }
 const AI_PROMPTS={
   optimal: `당신은 SLG 전장 시뮬레이터의 전략 분석 AI입니다.
 아래 게임 상태에서 "내 연맹"이 7도시 또는 8도시를 점령하기 위한 최적 경로와 타워 배치를 추천해주세요.
@@ -2924,8 +2963,18 @@ async function aiAction(type){
   }
   const resultEl=document.getElementById('aiResult');
   resultEl.innerHTML='<div style="color:#60a5fa;text-align:center;padding:20px 0">🤖 분석 중... (5~10초)</div>';
-  const context=buildAIContext();
-  const prompt=AI_PROMPTS[type]+'\n\n'+context;
+  // 게임 규칙(고정) + 타입별 사전계산 결과
+  const GAME_RULES=`[게임 규칙]
+- 타워: 9×9 블록, 도시/헬기장: 15×15 블록
+- 인접 조건: 한 축 겹침(<9) AND 다른 축 가장자리 접촉(≤9, GAP=0)
+- 타워가 도시/헬기장 가장자리 닿으면 해당 연맹 소유 발동
+- 도시는 다음 타워의 "다리"로 작동 (더 큰 step 가능, hs=12)
+- 도시 점수: 6도시=100k, 7도시=300k, 8도시=600k
+- 7도시는 프리즘코인도 누적 (코인×1000 = 추가 점수)
+- 다른 연맹과 동맹/적대 관계 → 적대만 충돌 예측 대상
+- 코인추격 시스템 (별도 메커니즘)`;
+  const context=buildAIContext(type);
+  const prompt=AI_PROMPTS[type]+'\n\n'+GAME_RULES+'\n\n'+context;
   try{
     const resp=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`,{
       method:'POST',
