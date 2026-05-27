@@ -517,10 +517,10 @@ tr:hover td{background:oklch(0.82 0.15 195/.025)}
           style="flex:1;background:#0d1825;border:1px solid #1e3a5f;border-radius:4px;color:#eee;font-size:.74rem;padding:5px 8px;font-family:'Space Mono',monospace">
         <select id="aiModelSel" onchange="localStorage.setItem('gemini_model',this.value)"
           style="background:#0d1825;border:1px solid #1e3a5f;border-radius:4px;color:#eee;font-size:.7rem;padding:5px;font-family:inherit">
-          <option value="gemini-2.5-flash-lite">2.5 Flash Lite</option>
-          <option value="gemini-2.5-flash">2.5 Flash</option>
-          <option value="gemini-2.0-flash-lite">2.0 Flash Lite</option>
+          <option value="gemini-2.5-flash">2.5 Flash (추천)</option>
+          <option value="gemini-2.5-flash-lite">2.5 Flash Lite (빠름)</option>
           <option value="gemini-2.0-flash">2.0 Flash</option>
+          <option value="gemini-2.0-flash-lite">2.0 Flash Lite</option>
           <option value="gemini-1.5-flash-8b">1.5 Flash 8B</option>
           <option value="gemini-1.5-flash">1.5 Flash</option>
         </select>
@@ -2999,11 +2999,23 @@ function precomputeForAI(type){
   const myLastPos=al.towers.length>0
     ?{x:al.towers[al.towers.length-1].x,y:al.towers[al.towers.length-1].y}
     :{x:myHelCx,y:myHelCy};
+  const bm=G('tBuildMin')||23;
+  const effBm=getEffBuildMin(al,bm);
   const out=[];
 
+  // === 공통: 내 위치 + 자원 ===
+  out.push(`[내 연맹 ${al.name}]`);
+  out.push(`시작점: ${al.towers.length>0?`타워#${al.towers.length}(${myLastPos.x},${myLastPos.y})`:`헬기장(${myHelCx},${myHelCy})`}`);
+  out.push(`보유: 시멘트 ${al.cement}k, 분당생산 ${al.prod||0}k, 타워 ${al.towers.length}개, 점수 ${(myScore.total/1000).toFixed(0)}k`);
+  const buildable=Math.floor(al.cement*1000/Math.max(1,getTowerCost(al.towers.length+1)));
+  out.push(`즉시 건설 가능: 약 ${buildable}개 (1개 비용 ${(getTowerCost(al.towers.length+1)/1000).toFixed(0)}k)`);
+  out.push(`건설 1개 시간: ${effBm.toFixed(1)}분`);
+
+  // === optimal/priority: 도시별 경로·효율 매트릭스 ===
   if(type==='optimal' || type==='priority'){
-    const cands=cities.map((c)=>{
+    const cands=cities.map(c=>{
       const ccx=c.x+c.r/2, ccy=c.y-c.r/2;
+      const ownLabel=c.owner===activeIdx?'내소유':c.owner!=null?alliances[c.owner].name+'소유':'미점령';
       if(c.owner===activeIdx) return null;
       const dist=Math.hypot(ccx-myLastPos.x,ccy-myLastPos.y);
       const fromHelipad=al.towers.length===0;
@@ -3011,20 +3023,25 @@ function precomputeForAI(type){
       let cost=0;
       const start=al.towers.length;
       for(let i=0;i<n;i++) cost+=getTowerCost(start+i+1);
-      const score={6:100,7:300,8:600}[c.level]||0;
-      const eff=score/(cost/1000+1);
-      return {label:c.label,lvl:c.level,owner:c.owner!=null?alliances[c.owner].name:'미점령',dist:Math.round(dist),n,cost,score,eff:+eff.toFixed(2)};
+      const cityScore={6:100,7:300,8:600}[c.level]||0;
+      const totalTimeMin=n*effBm;
+      const eff=cityScore/(cost/1000+1);
+      const cementShortfall=cost-al.cement*1000;
+      return {label:c.label,lvl:c.level,owner:ownLabel,dist:Math.round(dist),n,cost,cityScore,eff:+eff.toFixed(2),timeMin:Math.round(totalTimeMin),cementShortfall};
     }).filter(x=>x).sort((a,b)=>b.eff-a.eff);
-    out.push('미점령 도시 후보 (효율순 상위 6):');
-    cands.slice(0,6).forEach((c,i)=>{
-      out.push(`${i+1}. ${c.label} L${c.lvl}(${c.owner}) 거리${c.dist}칸 타워${c.n}개 비용${(c.cost/1000).toFixed(0)}k 점수${c.score}k 효율${c.eff}`);
+    out.push('');
+    out.push('[미점령/타연맹소유 도시별 효율 (정렬: 효율순)]');
+    out.push('  도시 / 레벨 / 현소유 / 거리 / 타워수 / 비용 / 점수 / 효율 / 소요시간 / 시멘트부족');
+    cands.forEach(c=>{
+      const shortfall=c.cementShortfall>0?`-${(c.cementShortfall/1000).toFixed(0)}k부족`:'OK';
+      out.push(`- ${c.label} L${c.lvl} ${c.owner} ${c.dist}칸 ${c.n}개 ${(c.cost/1000).toFixed(0)}k ${c.cityScore}k 효율${c.eff} ${c.timeMin}분 ${shortfall}`);
     });
-    const buildable=Math.floor(al.cement*1000/Math.max(1,getTowerCost(al.towers.length+1)));
-    out.push(`내 현황: 시멘트${al.cement}k, 타워${al.towers.length}개, 점수${(myScore.total/1000).toFixed(0)}k, 즉시건설가능~${buildable}개`);
   }
 
+  // === analysis: 모든 연맹 × 모든 도시 거리 매트릭스 + 위협 분석 ===
   if(type==='analysis'){
-    out.push('연맹 현황·방향·근접도시:');
+    out.push('');
+    out.push('[모든 연맹의 위치·진행방향·점수]');
     alliances.forEach((a,i)=>{
       if(i===activeIdx) return;
       const s=calcScore(i);
@@ -3033,74 +3050,124 @@ function precomputeForAI(type){
       const refY=lastT?lastT.y:a.helipad.y-a.helipad.r/2;
       const dirX=lastT?lastT.x-(a.helipad.x+a.helipad.r/2):0;
       const dirY=lastT?lastT.y-(a.helipad.y-a.helipad.r/2):0;
-      let near=null, nearD=Infinity;
-      cities.forEach(c=>{
-        if(c.owner===i) return;
+      const dirStr=dirX===0&&dirY===0?'움직임없음':`벡터(${dirX>0?'+':''}${dirX},${dirY>0?'+':''}${dirY})`;
+      const rel=getRel(activeIdx,i);
+      const relStr=rel==='ally'?'동맹':rel==='enemy'?'적대':'중립';
+      out.push(`- ${a.name}(${relStr}) 위치(${refX},${refY}) ${dirStr} 타워${a.towers.length} 점수${(s.total/1000).toFixed(0)}k 시멘트${a.cement}k`);
+      // 각 적의 미점령 도시 도달 거리 top3
+      const targets=cities.map(c=>{
+        if(c.owner===i) return null;
         const ccx=c.x+c.r/2, ccy=c.y-c.r/2;
         const d=Math.hypot(ccx-refX,ccy-refY);
-        if(d<nearD){nearD=d;near=c;}
-      });
-      const rel=getRel(activeIdx,i);
-      out.push(`- ${a.name}(${rel==='ally'?'동맹':rel==='enemy'?'적대':'중립'}) 타워${a.towers.length}점수${(s.total/1000).toFixed(0)}k 방향(${dirX>0?'+x':'-x'},${dirY>0?'+y':'-y'}) 표적후보:${near?.label||'?'}(${Math.round(nearD)}칸)`);
+        const n=calcTowerCountFor(refX,refY,ccx,ccy,a.towers.length===0?a.helipad.r:null);
+        return {label:c.label,lvl:c.level,dist:Math.round(d),n};
+      }).filter(x=>x).sort((a,b)=>a.dist-b.dist).slice(0,3);
+      targets.forEach(t=>out.push(`    가까운 도시: ${t.label} L${t.lvl} (${t.dist}칸, ${t.n}타워)`));
     });
+    // 충돌 예상
     if(lastCollisions&&lastCollisions.length){
-      out.push('충돌예상:');
-      lastCollisions.slice(0,3).forEach(c=>out.push(`- ${c.alA.name}vs${c.alB.name} ~${Math.round(c.time)}분후`));
+      out.push('');
+      out.push('[계산된 충돌 예상]');
+      lastCollisions.forEach(c=>out.push(`- ${c.alA.name} vs ${c.alB.name} 약 ${Math.round(c.time)}분후 좌표(${c.x},${c.y})`));
     }
   }
 
+  // === simulate: 잠재 점수 시뮬레이션 ===
   if(type==='simulate'){
-    out.push('연맹별 점수:');
+    out.push('');
+    out.push('[현재 연맹별 점수 + 잠재 점수 시뮬]');
     alliances.forEach((a,i)=>{
       const s=calcScore(i);
-      const owned=cities.filter(c=>c.owner===i).map(c=>`L${c.level}`).join(',');
-      out.push(`- ${a.name}: ${(s.total/1000).toFixed(0)}k [${owned||'없음'}] T${a.towers.length} C${a.cement}k`);
+      const ownedList=cities.filter(c=>c.owner===i).map(c=>`${c.label}(L${c.level})`).join(',')||'없음';
+      // 가장 가까운 미점령 6/7/8 도시 1개씩 잠재 점수
+      const hRef={x:a.towers.length>0?a.towers[a.towers.length-1].x:a.helipad.x+a.helipad.r/2,
+                  y:a.towers.length>0?a.towers[a.towers.length-1].y:a.helipad.y-a.helipad.r/2};
+      const reach={};
+      [6,7,8].forEach(lv=>{
+        const near=cities.filter(c=>c.owner==null&&c.level===lv)
+          .map(c=>{
+            const d=Math.hypot(c.x+c.r/2-hRef.x,c.y-c.r/2-hRef.y);
+            const n=calcTowerCountFor(hRef.x,hRef.y,c.x+c.r/2,c.y-c.r/2,a.towers.length===0?a.helipad.r:null);
+            let cost=0; for(let k=0;k<n;k++) cost+=getTowerCost(a.towers.length+k+1);
+            return {label:c.label,d:Math.round(d),n,cost};
+          }).sort((a,b)=>a.d-b.d)[0];
+        if(near) reach[lv]=near;
+      });
+      const reachStr=Object.entries(reach).map(([lv,r])=>`L${lv}:${r.label}(${r.d}칸/${r.n}타워/${(r.cost/1000).toFixed(0)}k)`).join(' ');
+      out.push(`- ${a.name}: 현재 ${(s.total/1000).toFixed(0)}k [${ownedList}] T${a.towers.length}/C${a.cement}k 분당${a.prod||0}k`);
+      if(reachStr) out.push(`    가까운 미점령: ${reachStr}`);
     });
     const left={6:0,7:0,8:0};
     cities.forEach(c=>{if(c.owner==null) left[c.level]++;});
-    out.push(`남은 미점령: 6=${left[6]}, 7=${left[7]}, 8=${left[8]} (점수 100k/300k/600k)`);
+    out.push('');
+    out.push(`[남은 미점령] 6=${left[6]}, 7=${left[7]}, 8=${left[8]} (점수 100k/300k/600k)`);
   }
 
-  out.push(`내 연맹: ${al.name}`);
   return out.join('\n');
 }
 function buildAIContext(type){ return precomputeForAI(type||'optimal'); }
 const AI_PROMPTS={
-  optimal:`당신은 SLG 전장 전략 AI. "내 연맹"이 7도시 또는 8도시 중 어디를 우선 점령할지 판단.
+  optimal:`당신은 SLG 전장 전략 AI. 사전계산된 도시별 효율 매트릭스를 보고 가장 점수 효율이 높은 도시 1개를 선택.
 
-⚠ 실제 타워 좌표는 JS가 헬기장/마지막 타워에서부터 자동 계산. 당신은 target_city 이름만 정확히 골라.
+판단 기준 (반드시 데이터 참조):
+1. 효율값(점수/비용) 최상위 우선
+2. 시멘트부족 OK인 도시 우선 (즉시 가능)
+3. 타워수 적은 곳 선호
+4. L8(600k) > L7(300k) > L6(100k) 점수 가중치
+
+⚠ 실제 좌표는 JS가 계산. target_city 이름만 정확히 (라벨 그대로, 예: "8도시", "7도시-1").
 
 응답(JSON):
-- target_city: 도시 이름 (예: "7도시-1", "8도시")
-- tower_positions: [] (빈 배열, JS가 채움)
-- summary: 한 문장 (왜 이 도시인지)
+- target_city: "L도시-N" 또는 "8도시"
+- tower_positions: [] (빈)
+- summary: 구체적 숫자 근거 1~2문장 (예: "8도시는 거리 80칸·6타워·비용 70k로 효율 8.5 최고. 6도시-1을 다리로 활용.")
 
 한국어.`,
-  priority:`당신은 SLG 전략 코치. 다음에 노릴 도시 1·2·3순위 추천.
 
-⚠ 좌표는 JS가 계산. target_city 이름만 정확히.
+  priority:`당신은 SLG 전략 코치. 효율 매트릭스 기준 다음 노릴 도시 1·2·3순위 추천.
+
+기준:
+- 1순위: 효율 최상위 + 즉시 가능 (시멘트 OK)
+- 2순위: 효율 차상위 또는 시멘트 모자라도 짧은 거리
+- 3순위: 장기 목표 (L8 또는 점수 큰 곳)
+각 순위에 반드시 도시 이름·왜 그 순위인지 숫자 근거.
+
+⚠ x,y는 0으로 두고 target_city 이름만.
 
 응답(JSON):
-- priorities: [{rank:1, target_city:"...", x:0, y:0, reason:"짧게"}, ...]
-  (x,y는 0으로 두기)
-- summary: 한 줄
+- priorities: [{rank:1, target_city:"...", x:0, y:0, reason:"구체적 숫자 근거"}, {rank:2,...}, {rank:3,...}]
+- summary: 1줄
 
 한국어.`,
-  analysis:`당신은 SLG 정보 분석 AI. "내 연맹" 관점에서 다른 연맹 위협·기회 분석.
+
+  analysis:`당신은 SLG 정보 분석 AI. 각 적 연맹의 진행방향·근접도시·타워수를 보고 위협을 평가.
+
+위협 등급:
+- high: 적이 내 영역에 닿거나 점수 큰 도시(L7/L8) 노림 + 충돌예상 존재
+- medium: 적이 같은 도시 노리고 있지만 거리/타워수 차이로 상대적 안전
+- low: 멀리 있거나 영향 없음
+
+⚠ target_x, target_y는 적 연맹이 노리는 가장 가까운 미점령 도시 중심 좌표 (사전계산 데이터에서 추출).
 
 응답(JSON):
-- threats: [{alliance:"이름", target_x, target_y, severity:"high/medium/low", reason:"짧게"}]
-  (target_x,y는 적 연맹이 노리는 도시 중심 좌표)
-- opportunities: [{x, y, description}] (선택)
-- summary: 한 줄
+- threats: [{alliance:"이름", target_x, target_y, severity:"high/medium/low", reason:"구체적: 어느 도시·몇칸·몇타워"}]
+- opportunities: [{x, y, description}] (선택, 내가 노릴만한 빈 도시 좌표)
+- summary: 가장 큰 위협 1줄
 
 한국어.`,
-  simulate:`당신은 결과 예측 AI. 현재 상태로 최종 점수 시뮬레이션.
+
+  simulate:`당신은 결과 예측 AI. 현재 점수 + 잠재(가까운 도시) 점수 + 분당생산 + 시멘트 보유를 종합해 최종 점수 예측.
+
+예측 방법:
+- 각 연맹의 가까운 미점령 L6/L7/L8 도시 점령 가능성 평가 (시멘트·거리 기준)
+- 현재 점수 + 가능한 도시 점수 합산 = predicted_score (k 단위)
+- 1위 ~ 마지막 순위 매기기
+- 내 승리 확률 = 1위 가능성 평가 (역전 가능성·자원 차이 고려)
 
 응답(JSON):
-- rankings: [{alliance:"이름", predicted_score:NNN, rank:1}, ...] (predicted_score는 k 단위 숫자)
+- rankings: [{alliance:"이름", predicted_score:NNN, rank:1}, ...] (predicted_score는 k 단위 정수)
 - my_win_probability: 0~100 정수
-- summary: 한 줄
+- summary: 1위 예측 + 내 변수 1줄
 
 한국어.`
 };
@@ -3222,7 +3289,7 @@ async function aiAction(type){
   const context=buildAIContext(type);
   const prompt=AI_PROMPTS[type]+'\n\n'+GAME_RULES+'\n\n'+context+'\n\n반드시 JSON schema에 맞춰서만 응답하라.';
   try{
-    const model=localStorage.getItem('gemini_model')||'gemini-2.5-flash-lite';
+    const model=localStorage.getItem('gemini_model')||'gemini-2.5-flash';
     const resp=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,{
       method:'POST',
       headers:{'Content-Type':'application/json'},
