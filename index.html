@@ -1917,6 +1917,28 @@ function drawAIOverlay(){
   ctx.save();
 
   if(type==='optimal' && data.tower_positions){
+    // 시작점 표시 (헬기장 또는 마지막 타워)
+    if(data._start){
+      const {cx,cy}=toC(data._start.x,data._start.y);
+      ctx.fillStyle='rgba(74,222,128,0.85)';
+      ctx.beginPath(); ctx.arc(cx,cy,ppc*2,0,Math.PI*2); ctx.fill();
+      if(ppc>=2){
+        ctx.fillStyle='#4ade80';
+        ctx.font=`bold ${Math.max(8,ppc*1.6)}px "Space Grotesk",sans-serif`;
+        ctx.textAlign='center'; ctx.textBaseline='bottom';
+        ctx.fillText('▶ '+(data._start.label||'START'),cx,cy-ppc*2.5);
+      }
+    }
+    // 시작점→첫 타워 연결선
+    if(data._start && data.tower_positions.length>0){
+      const {cx:sx,cy:sy}=toC(data._start.x,data._start.y);
+      const first=data.tower_positions.find(p=>p.order===1)||data.tower_positions[0];
+      const {cx:fx,cy:fy}=toC(first.x,first.y);
+      ctx.strokeStyle='rgba(251,191,36,0.6)';
+      ctx.lineWidth=1.5; ctx.setLineDash([4,3]);
+      ctx.beginPath(); ctx.moveTo(sx,sy); ctx.lineTo(fx,fy); ctx.stroke();
+      ctx.setLineDash([]);
+    }
     // 추천 타워 위치를 노란 점선 박스로
     data.tower_positions.forEach(p=>{
       const {cx,cy}=toC(p.x,p.y), s=TS*ppc;
@@ -1949,7 +1971,22 @@ function drawAIOverlay(){
 
   if(type==='priority' && data.priorities){
     const colors={1:'#ef4444',2:'#fbbf24',3:'#22c55e'};
+    // 시작점 표시
+    if(data._start){
+      const {cx,cy}=toC(data._start.x,data._start.y);
+      ctx.fillStyle='rgba(96,165,250,0.85)';
+      ctx.beginPath(); ctx.arc(cx,cy,ppc*1.8,0,Math.PI*2); ctx.fill();
+    }
     data.priorities.forEach(p=>{
+      // 시작점→이 우선순위로 연결선
+      if(data._start){
+        const {cx:sx,cy:sy}=toC(data._start.x,data._start.y);
+        const {cx:px,cy:py}=toC(p.x,p.y);
+        ctx.strokeStyle=(colors[p.rank]||'#888')+'66';
+        ctx.lineWidth=1.5; ctx.setLineDash([4,3]);
+        ctx.beginPath(); ctx.moveTo(sx,sy); ctx.lineTo(px,py); ctx.stroke();
+        ctx.setLineDash([]);
+      }
       const {cx,cy}=toC(p.x,p.y), s=TS*ppc;
       const c=colors[p.rank]||'#888';
       ctx.setLineDash([6,3]);
@@ -3029,79 +3066,43 @@ function precomputeForAI(type){
 }
 function buildAIContext(type){ return precomputeForAI(type||'optimal'); }
 const AI_PROMPTS={
-  optimal: `당신은 SLG 전장 시뮬레이터의 전략 분석 AI입니다.
-아래 게임 상태에서 "내 연맹"이 7도시 또는 8도시를 점령하기 위한 최적 경로와 타워 배치를 추천해주세요.
+  optimal:`당신은 SLG 전장 전략 AI. "내 연맹"이 7도시 또는 8도시 중 어디를 우선 점령할지 판단.
 
-게임 규칙:
-- 타워는 9×9 블록, 도시는 15×15 블록
-- 인접 조건: 한 축 겹침(<9) AND 다른 축 가장자리 접촉(≤9)
-- 타워가 도시 가장자리에 닿으면 도시가 해당 연맹 소유로 전환됨
-- 도시는 다음 타워의 "다리"로 작용 (더 큰 step 가능)
+⚠ 실제 타워 좌표는 JS가 헬기장/마지막 타워에서부터 자동 계산. 당신은 target_city 이름만 정확히 골라.
 
-분석 결과를 다음 형식으로:
-- **목표 도시**: (어디로 갈지)
-- **경로 요약**: (전체 흐름)
-- **핵심 타워 좌표**: 5~10개 (구체적 x,y)
-- **이유**: (왜 이 경로가 최적인지)
-- **주의사항**: (적대 연맹 차단 등)
+응답(JSON):
+- target_city: 도시 이름 (예: "7도시-1", "8도시")
+- tower_positions: [] (빈 배열, JS가 채움)
+- summary: 한 문장 (왜 이 도시인지)
 
-답변은 한국어로, 200자 이내 간결하게.`,
+한국어.`,
+  priority:`당신은 SLG 전략 코치. 다음에 노릴 도시 1·2·3순위 추천.
 
-  priority: `당신은 SLG 전장 전략 코치 AI입니다.
-아래 게임 상태에서 "내 연맹"이 다음에 어디에 타워를 지어야 점수/효율이 가장 좋을지 추천해주세요.
+⚠ 좌표는 JS가 계산. target_city 이름만 정확히.
 
-분석 항목:
-- 가장 가까운 미점령 6/7/8 도시
-- 현재 시멘트로 몇 개 타워 건설 가능한지
-- 적대 연맹의 차단 가능성
-- 1순위, 2순위, 3순위 추천 위치 (좌표 포함)
+응답(JSON):
+- priorities: [{rank:1, target_city:"...", x:0, y:0, reason:"짧게"}, ...]
+  (x,y는 0으로 두기)
+- summary: 한 줄
 
-답변 형식:
-**1순위**: 좌표 (x,y) → 도시 N — 이유
-**2순위**: 좌표 (x,y) → 도시 N — 이유
-**3순위**: 좌표 (x,y) → 도시 N — 이유
+한국어.`,
+  analysis:`당신은 SLG 정보 분석 AI. "내 연맹" 관점에서 다른 연맹 위협·기회 분석.
 
-한국어, 150자 이내.`,
+응답(JSON):
+- threats: [{alliance:"이름", target_x, target_y, severity:"high/medium/low", reason:"짧게"}]
+  (target_x,y는 적 연맹이 노리는 도시 중심 좌표)
+- opportunities: [{x, y, description}] (선택)
+- summary: 한 줄
 
-  analysis: `당신은 SLG 전장 정보 분석 AI입니다.
-아래 게임 상태에서 "내 연맹"의 관점에서 다른 연맹들을 분석해주세요.
+한국어.`,
+  simulate:`당신은 결과 예측 AI. 현재 상태로 최종 점수 시뮬레이션.
 
-분석 항목:
-- 각 연맹의 현재 진행 방향(어느 도시로 향하는지)
-- 위협 연맹 (점수/위치 기준)
-- 가장 큰 적
-- 동맹 결성 가능 후보
-- 충돌 예상 지점
+응답(JSON):
+- rankings: [{alliance:"이름", predicted_score:NNN, rank:1}, ...] (predicted_score는 k 단위 숫자)
+- my_win_probability: 0~100 정수
+- summary: 한 줄
 
-답변 형식:
-**위협 분석**: ...
-**기회**: ...
-**전략 제언**: ...
-
-한국어, 200자 이내.`,
-
-  simulate: `당신은 SLG 전장 결과 예측 AI입니다.
-아래 게임 상태가 그대로 유지된다고 가정하고 최종 결과를 시뮬레이션하세요.
-
-도시 점수: 6도시=10만, 7도시=30만, 8도시=60만
-프리즘코인은 추가 점수
-
-분석 항목:
-- 각 연맹 예상 최종 점수
-- 1위, 2위, 3위 순위
-- 내 연맹 승리 확률 (%)
-- 변수 (역전 가능성)
-
-답변 형식:
-**순위 예측**:
-1위 [연맹] — 점수
-2위 [연맹] — 점수
-...
-
-**내 연맹 승리 확률**: NN%
-**이유**: ...
-
-한국어, 200자 이내.`
+한국어.`
 };
 const AI_SCHEMAS={
   optimal:{
@@ -3247,6 +3248,37 @@ async function aiAction(type){
       if(resultEl) resultEl.innerHTML=`<div style="color:#f87171">파싱 실패: ${text.slice(0,200)}</div>`;
       return;
     }
+    // AI는 "어느 도시" 전략만 결정. 실제 타워 좌표는 JS가 시작점 기준으로 재생성.
+    const al2=alliances[activeIdx];
+    if(al2){
+      const lastT=al2.towers.length>0?al2.towers[al2.towers.length-1]:null;
+      const startX=lastT?lastT.x:(al2.helipad.x+al2.helipad.r/2);
+      const startY=lastT?lastT.y:(al2.helipad.y-al2.helipad.r/2);
+      const startType=lastT?'tower':'helipad';
+      const startR=lastT?0:al2.helipad.r;
+      // optimal: target_city 이름으로 도시 찾아 planTowerPlacement 실행
+      if(type==='optimal' && parsed.target_city){
+        const tc=cities.find(c=>c.label===parsed.target_city);
+        if(tc){
+          const tx=tc.x+tc.r/2, ty=tc.y-tc.r/2;
+          const positions=planTowerPlacement(startX,startY,startType,startR,tx,ty,al2);
+          parsed.tower_positions=positions.map((p,i)=>({x:p.x,y:p.y,order:i+1,note:p.throughCity?`🏙 ${p.throughCity.label} 다리`:''}));
+          parsed._start={x:startX,y:startY,label:lastT?`타워#${al2.towers.length}`:'헬기장'};
+        }
+      }
+      // priority: 각 priority도시까지의 첫 step만 JS로 재계산
+      if(type==='priority' && parsed.priorities){
+        parsed.priorities.forEach(p=>{
+          const tc=cities.find(c=>c.label===p.target_city) || null;
+          if(tc){
+            const tx=tc.x+tc.r/2, ty=tc.y-tc.r/2;
+            const positions=planTowerPlacement(startX,startY,startType,startR,tx,ty,al2);
+            if(positions.length>0){ p.x=positions[0].x; p.y=positions[0].y; }
+          }
+        });
+        parsed._start={x:startX,y:startY};
+      }
+    }
     aiOverlay={type,data:parsed,summary:parsed.summary||'',time:Date.now()};
     draw();
     const icon=iconMap[type];
@@ -3273,11 +3305,12 @@ function showAIToast(html,color){
   if(!el){
     el=document.createElement('div');
     el.id='aiToast';
-    el.style.cssText='position:fixed;top:14px;right:14px;z-index:9500;'
+    // 헤더 3행(약 110px) 아래에 표시 — 헤더 버튼 가리지 않도록
+    el.style.cssText='position:fixed;top:120px;right:14px;z-index:9500;'
       +'background:rgba(10,20,35,0.95);border-left:3px solid #60a5fa;'
-      +'border-radius:6px;padding:10px 14px;color:#c8daf0;font-size:.74rem;'
-      +'box-shadow:0 6px 20px rgba(0,0,0,0.55);max-width:340px;'
-      +'font-family:"Space Grotesk",sans-serif;line-height:1.55';
+      +'border-radius:6px;padding:9px 12px;color:#c8daf0;font-size:.72rem;'
+      +'box-shadow:0 6px 20px rgba(0,0,0,0.55);max-width:300px;'
+      +'font-family:"Space Grotesk",sans-serif;line-height:1.5';
     document.body.appendChild(el);
   }
   if(color) el.style.borderLeftColor=color;
